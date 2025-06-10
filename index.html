@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inventory Entry</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>📋 Inventory Entry</h1>
+
+    <div class="card">
+      <label for="itemName">Item</label>
+      <input type="text" id="itemName" placeholder="e.g. Vodka" autofocus />
+      <label for="itemQty">Quantity</label>
+      <input type="number" id="itemQty" min="0" placeholder="e.g. 12" />
+      <button onclick="addItem()">Add Item</button>
+    </div>
+
+    <div class="inventory">
+      <h2>Current Inventory</h2>
+      <ul id="inventoryList"></ul>
+      <button onclick="exportCSV()">Export CSV</button>
+    </div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
