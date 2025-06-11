@@ -1,55 +1,65 @@
 const inventory = [];
 
-function addItem() {
-  const name = document.getElementById("itemName").value.trim();
-  const qty = parseInt(document.getElementById("itemQty").value, 10);
+document.getElementById("inventory-form").addEventListener("submit", function (e) {
+  e.preventDefault();
+  const name = document.getElementById("item-name").value.trim();
+  const qty = parseInt(document.getElementById("item-quantity").value.trim(), 10);
+  if (!name || isNaN(qty)) return;
 
-  if (!name || isNaN(qty) || qty < 0) {
-    alert("Enter valid item and quantity.");
-    return;
-  }
+  inventory.push({ name, quantity: qty });
+  updateList();
+  this.reset();
+});
 
-  inventory.push({ name, qty });
-  document.getElementById("itemName").value = "";
-  document.getElementById("itemQty").value = "";
-  document.getElementById("itemName").focus();
-
-  renderList();
-}
-
-function renderList() {
-  const list = document.getElementById("inventoryList");
+function updateList() {
+  const list = document.getElementById("inventory-list");
   list.innerHTML = "";
-
   inventory.forEach((item, index) => {
     const li = document.createElement("li");
-    li.innerHTML = `${item.name} x${item.qty} 
-      <button onclick="removeItem(${index})">🗑️</button>`;
+    li.textContent = `${item.name} — ${item.quantity}`;
     list.appendChild(li);
   });
 }
 
-function removeItem(index) {
-  inventory.splice(index, 1);
-  renderList();
+function exportAsExcel() {
+  let content = `<table><tr><th>Item</th><th>Quantity</th></tr>`;
+  inventory.forEach(i => {
+    content += `<tr><td>${i.name}</td><td>${i.quantity}</td></tr>`;
+  });
+  content += `</table>`;
+  const html = `
+    <html><head><meta charset="UTF-8"></head>
+    <body>${content}</body></html>
+  `;
+  download(html, "inventory.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 }
 
-function exportCSV() {
-  if (inventory.length === 0) {
-    alert("No items to export.");
-    return;
-  }
-
-  let csv = "Item,Quantity\n";
-  inventory.forEach(item => {
-    csv += `${item.name},${item.qty}\n`;
+function exportAsDoc() {
+  let docContent = `<h1>Inventory Report</h1><table border="1" cellpadding="6"><tr><th>Item</th><th>Quantity</th></tr>`;
+  inventory.forEach(i => {
+    docContent += `<tr><td>${i.name}</td><td>${i.quantity}</td></tr>`;
   });
+  docContent += `</table>`;
+  const html = `<html><head><meta charset="UTF-8"></head><body>${docContent}</body></html>`;
+  download(html, "inventory.doc", "application/msword");
+}
 
-  const blob = new Blob([csv], { type: "text/csv" });
+function exportAsHTML() {
+  let html = `<h1>Inventory Snapshot</h1><ul>`;
+  inventory.forEach(i => {
+    html += `<li>${i.name}: ${i.quantity}</li>`;
+  });
+  html += `</ul>`;
+  const wrapped = `<html><head><meta charset="UTF-8"></head><body>${html}</body></html>`;
+  download(wrapped, "inventory.html", "text/html");
+}
+
+function download(content, filename, mime) {
+  const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
-
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "inventory.csv";
-  link.click();
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
