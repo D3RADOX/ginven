@@ -3,27 +3,27 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Inventory Entry</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>Inventory Exporter</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="container">
-    <h1>📋 Inventory Entry</h1>
+  <main>
+    <h1>Inventory Entry</h1>
+    <form id="inventory-form">
+      <input type="text" id="item-name" placeholder="Item name" required />
+      <input type="number" id="item-quantity" placeholder="Quantity" min="1" required />
+      <button type="submit">Add Item</button>
+    </form>
 
-    <div class="card">
-      <label for="itemName">Item</label>
-      <input type="text" id="itemName" placeholder="e.g. Vodka" autofocus />
-      <label for="itemQty">Quantity</label>
-      <input type="number" id="itemQty" min="0" placeholder="e.g. 12" />
-      <button onclick="addItem()">Add Item</button>
-    </div>
+    <ul id="inventory-list"></ul>
 
-    <div class="inventory">
-      <h2>Current Inventory</h2>
-      <ul id="inventoryList"></ul>
-      <button onclick="exportCSV()">Export CSV</button>
+    <div class="export-buttons">
+      <button onclick="exportAsExcel()">Export as XLSX</button>
+      <button onclick="exportAsDoc()">Export as DOC</button>
+      <button onclick="exportAsHTML()">Export as HTML</button>
     </div>
-  </div>
+  </main>
+
   <script src="script.js"></script>
 </body>
 </html>
