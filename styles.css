@@ -1,105 +1,60 @@
-/* Mobile-first, hardened layout */
-
-* {
-  box-sizing: border-box;
-}
-
 body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f4;
   margin: 0;
-  padding: 0;
-  font-family: 'Segoe UI', sans-serif;
-  background: #f7f7f7;
-  color: #222;
+  padding: 2rem;
 }
 
-.container {
-  max-width: 500px;
-  margin: auto;
-  padding: 20px;
-}
-
-h1, h2 {
-  text-align: center;
-  font-size: 20px;
-  margin-bottom: 16px;
-}
-
-.card {
-  background: #ffffff;
-  border-radius: 10px;
-  padding: 16px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.05);
-  margin-bottom: 24px;
-}
-
-.card label {
-  display: block;
-  font-weight: bold;
-  margin-top: 10px;
-  font-size: 14px;
-}
-
-.card input {
-  width: 100%;
-  padding: 10px;
-  font-size: 16px;
-  margin-top: 4px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
+main {
   background: #fff;
+  padding: 2rem;
+  max-width: 600px;
+  margin: auto;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
 }
 
-.card button {
-  margin-top: 16px;
-  width: 100%;
-  padding: 12px;
-  background: #007f5f;
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+input {
+  padding: 0.75rem;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+button {
+  padding: 0.75rem;
+  font-size: 1rem;
+  background: #111;
   color: white;
   border: none;
-  border-radius: 6px;
-  font-size: 16px;
+  border-radius: 8px;
   cursor: pointer;
 }
 
-.card button:hover {
-  background: #005f47;
+button:hover {
+  background: #333;
 }
 
-.inventory {
-  background: #fff;
-  border-radius: 10px;
-  padding: 16px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.04);
-}
-
-.inventory ul {
+#inventory-list {
+  margin-top: 2rem;
+  padding-left: 0;
   list-style: none;
-  padding: 0;
 }
 
-.inventory li {
+#inventory-list li {
+  padding: 0.5rem;
+  border-bottom: 1px solid #ccc;
+}
+
+.export-buttons {
+  margin-top: 2rem;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 6px 0;
-  padding: 8px;
-  background: #f1f1f1;
-  border-radius: 6px;
-  font-size: 15px;
-}
-
-.inventory button {
-  width: 100%;
-  margin-top: 20px;
-  padding: 10px;
-  background: #2a2a2a;
-  color: #fff;
-  font-size: 14px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.inventory button:hover {
-  background: #111;
+  flex-direction: column;
+  gap: 0.5rem;
 }
