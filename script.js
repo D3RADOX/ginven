@@ -361,18 +361,98 @@ function addScore(pts, x, y) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════
+//  COLOR HELPERS
+// ═════════════════════════════════════════════════════════════════════════
+
+// rgba string from a #rrggbb hex + alpha 0..1
+function hexAlpha(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
+}
+
+// Brighten a #rrggbb color by adding (amount * 255) to each channel
+function lighten(hex, amount) {
+  const d = Math.round(255 * amount);
+  const r = Math.min(255, parseInt(hex.slice(1, 3), 16) + d);
+  const g = Math.min(255, parseInt(hex.slice(3, 5), 16) + d);
+  const b = Math.min(255, parseInt(hex.slice(5, 7), 16) + d);
+  return `rgb(${r},${g},${b})`;
+}
+
+// Darken a #rrggbb color by subtracting (amount * 255) from each channel
+function darken(hex, amount) {
+  const d = Math.round(255 * amount);
+  const r = Math.max(0, parseInt(hex.slice(1, 3), 16) - d);
+  const g = Math.max(0, parseInt(hex.slice(3, 5), 16) - d);
+  const b = Math.max(0, parseInt(hex.slice(5, 7), 16) - d);
+  return `rgb(${r},${g},${b})`;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+//  PLAYFIELD TEXTURE  (rendered once to an offscreen canvas)
+// ═════════════════════════════════════════════════════════════════════════
+let _fieldCanvas = null;
+
+function getFieldCanvas() {
+  if (_fieldCanvas) return _fieldCanvas;
+
+  _fieldCanvas      = document.createElement('canvas');
+  _fieldCanvas.width  = CW;
+  _fieldCanvas.height = CH;
+  const c = _fieldCanvas.getContext('2d');
+
+  // ── Base gradient ────────────────────────────────────────────────────
+  const bg = c.createLinearGradient(0, 0, 0, CH);
+  bg.addColorStop(0,    '#1e0034');
+  bg.addColorStop(0.4,  '#110022');
+  bg.addColorStop(1,    '#07000f');
+  c.fillStyle = bg;
+  c.fillRect(0, 0, CW, CH);
+
+  // ── Diagonal diamond lattice (very subtle felt-weave) ────────────────
+  c.save();
+  c.globalAlpha = 0.038;
+  c.strokeStyle = '#b060ff';
+  c.lineWidth   = 0.7;
+  const step = 20;
+  for (let i = -CH; i < CW + CH; i += step) {
+    c.beginPath(); c.moveTo(i, 0); c.lineTo(i + CH, CH); c.stroke();
+    c.beginPath(); c.moveTo(i, 0); c.lineTo(i - CH, CH); c.stroke();
+  }
+  c.restore();
+
+  // ── Overhead spotlight (centre-top, simulates physical table light) ──
+  const spot = c.createRadialGradient(CW * 0.5, CH * 0.25, 10, CW * 0.5, CH * 0.38, CW * 0.72);
+  spot.addColorStop(0, 'rgba(110, 30, 90, 0.22)');
+  spot.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  c.fillStyle = spot;
+  c.fillRect(0, 0, CW, CH);
+
+  // ── Second warm spotlight lower-centre (around bumper cluster) ───────
+  const spot2 = c.createRadialGradient(CW * 0.5, CH * 0.44, 5, CW * 0.5, CH * 0.44, CW * 0.42);
+  spot2.addColorStop(0, 'rgba(60, 0, 80, 0.18)');
+  spot2.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  c.fillStyle = spot2;
+  c.fillRect(0, 0, CW, CH);
+
+  // ── Edge vignette ────────────────────────────────────────────────────
+  const vig = c.createRadialGradient(CW / 2, CH / 2, CH * 0.2, CW / 2, CH / 2, CH * 0.8);
+  vig.addColorStop(0, 'rgba(0,0,0,0)');
+  vig.addColorStop(1, 'rgba(0,0,0,0.72)');
+  c.fillStyle = vig;
+  c.fillRect(0, 0, CW, CH);
+
+  return _fieldCanvas;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
 //  DRAW
 // ═════════════════════════════════════════════════════════════════════════
 function draw() {
-  // Background
-  ctx.fillStyle = '#080010';
-  ctx.fillRect(0, 0, CW, CH);
-
-  const bg = ctx.createLinearGradient(0, 0, 0, CH);
-  bg.addColorStop(0, '#160022');
-  bg.addColorStop(1, '#060010');
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, CW, CH);
+  // Playfield texture (pre-rendered, drawn once per frame as background)
+  ctx.drawImage(getFieldCanvas(), 0, 0);
 
   drawWalls();
   drawLanes();
@@ -384,151 +464,395 @@ function draw() {
   drawComboHint();
 }
 
-// ─────────────────────────── Walls & borders ─────────────────────────────
+// ─────────────────────────── Walls & chrome rails ────────────────────────
 function drawWalls() {
   ctx.save();
 
-  ctx.strokeStyle = '#ff1493';
-  ctx.lineWidth   = 3;
-  ctx.shadowColor = '#ff1493';
-  ctx.shadowBlur  = 10;
+  // Helper: draw a 3-layer chrome rail along any path
+  function chromePath(pathFn) {
+    // Layer 1 – thick dark base shadow
+    ctx.save();
+    ctx.lineWidth   = 9;
+    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+    ctx.shadowBlur  = 0;
+    ctx.lineCap     = 'round';
+    pathFn(); ctx.stroke();
+    ctx.restore();
+
+    // Layer 2 – main metal rail with purple/magenta glow
+    ctx.save();
+    ctx.lineWidth   = 5;
+    ctx.strokeStyle = '#7020a0';
+    ctx.shadowColor = '#ff1493';
+    ctx.shadowBlur  = 14;
+    ctx.lineCap     = 'round';
+    pathFn(); ctx.stroke();
+    ctx.restore();
+
+    // Layer 3 – bright top-edge highlight
+    ctx.save();
+    ctx.lineWidth   = 1.4;
+    ctx.strokeStyle = 'rgba(210, 100, 255, 0.80)';
+    ctx.shadowBlur  = 0;
+    ctx.lineCap     = 'round';
+    pathFn(); ctx.stroke();
+    ctx.restore();
+  }
 
   // Left wall
-  ctx.beginPath(); ctx.moveTo(10, 28); ctx.lineTo(10, CH); ctx.stroke();
+  chromePath(() => { ctx.beginPath(); ctx.moveTo(10, 28); ctx.lineTo(10, CH); });
   // Right wall
-  ctx.beginPath(); ctx.moveTo(CW - 10, 28); ctx.lineTo(CW - 10, CH); ctx.stroke();
+  chromePath(() => { ctx.beginPath(); ctx.moveTo(CW - 10, 28); ctx.lineTo(CW - 10, CH); });
   // Top arch
-  ctx.beginPath();
-  ctx.arc(CW / 2, 28, CW / 2 - 10, Math.PI, 0, false);
-  ctx.stroke();
+  chromePath(() => { ctx.beginPath(); ctx.arc(CW / 2, 28, CW / 2 - 10, Math.PI, 0, false); });
 
-  // Gutter guides
-  ctx.strokeStyle = '#c060c0';
-  ctx.lineWidth   = 2;
-  ctx.shadowColor = '#c060c0';
-  ctx.shadowBlur  = 6;
+  // Gutter guide walls
+  ctx.save();
+  ctx.lineCap     = 'round';
+  ctx.lineWidth   = 4;
+  ctx.strokeStyle = '#5a1880';
+  ctx.shadowColor = '#cc44ff';
+  ctx.shadowBlur  = 8;
   GUTTERS.forEach(g => {
     ctx.beginPath();
     ctx.moveTo(g.x1, g.y1);
     ctx.lineTo(g.x2, g.y2);
     ctx.stroke();
   });
-
-  // Drain glow
-  const drain = ctx.createLinearGradient(0, CH - 35, 0, CH);
-  drain.addColorStop(0, 'rgba(255,20,147,0)');
-  drain.addColorStop(1, 'rgba(255,20,147,0.07)');
-  ctx.fillStyle = drain;
-  ctx.fillRect(0, CH - 35, CW, 35);
+  // highlight edge
+  ctx.lineWidth   = 1;
+  ctx.strokeStyle = 'rgba(180, 90, 230, 0.55)';
+  ctx.shadowBlur  = 0;
+  GUTTERS.forEach(g => {
+    ctx.beginPath();
+    ctx.moveTo(g.x1, g.y1);
+    ctx.lineTo(g.x2, g.y2);
+    ctx.stroke();
+  });
+  ctx.restore();
 
   ctx.restore();
 }
 
-// ─────────────────────────── Rollover lanes ──────────────────────────────
+// ─────────────────────────── Rollover lanes (insert lights) ──────────────
 function drawLanes() {
   ctx.save();
   for (const l of LANES) {
+    // Bezel / housing ring
     ctx.beginPath();
-    ctx.arc(l.x, l.y, l.r, 0, Math.PI * 2);
-    ctx.fillStyle   = l.lit ? '#ffd700' : '#1e0035';
-    ctx.shadowColor = l.lit ? '#ffd700' : 'transparent';
-    ctx.shadowBlur  = l.lit ? 16 : 0;
+    ctx.arc(l.x, l.y, l.r + 2.5, 0, Math.PI * 2);
+    const bezel = ctx.createRadialGradient(l.x - 2, l.y - 2, l.r * 0.3, l.x, l.y, l.r + 3);
+    bezel.addColorStop(0, '#48485a');
+    bezel.addColorStop(1, '#111118');
+    ctx.fillStyle = bezel;
     ctx.fill();
-    ctx.strokeStyle = l.lit ? '#ffd700' : '#ff1493';
-    ctx.lineWidth   = 1.5;
+    ctx.strokeStyle = '#555568';
+    ctx.lineWidth   = 0.8;
     ctx.stroke();
 
-    ctx.fillStyle      = l.lit ? '#000' : '#ff69b4';
-    ctx.font           = 'bold 9px Courier New';
-    ctx.textAlign      = 'center';
-    ctx.textBaseline   = 'middle';
-    ctx.shadowBlur     = 0;
+    // Lens body
+    ctx.beginPath();
+    ctx.arc(l.x, l.y, l.r, 0, Math.PI * 2);
+    if (l.lit) {
+      const lens = ctx.createRadialGradient(
+        l.x - l.r * 0.25, l.y - l.r * 0.28, l.r * 0.08,
+        l.x, l.y, l.r
+      );
+      lens.addColorStop(0,    '#fffce8');
+      lens.addColorStop(0.28, '#ffd700');
+      lens.addColorStop(0.65, '#cc9800');
+      lens.addColorStop(1,    '#7a5a00');
+      ctx.fillStyle   = lens;
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur  = 20;
+    } else {
+      ctx.fillStyle = '#12102a';
+      ctx.shadowBlur = 0;
+    }
+    ctx.fill();
+
+    // Specular highlight on lens when lit
+    if (l.lit) {
+      const spec = ctx.createRadialGradient(
+        l.x - l.r * 0.28, l.y - l.r * 0.30, 0,
+        l.x - l.r * 0.28, l.y - l.r * 0.30, l.r * 0.52
+      );
+      spec.addColorStop(0, 'rgba(255,255,255,0.82)');
+      spec.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.beginPath();
+      ctx.arc(l.x, l.y, l.r, 0, Math.PI * 2);
+      ctx.fillStyle  = spec;
+      ctx.shadowBlur = 0;
+      ctx.fill();
+    }
+
+    // Label
+    ctx.fillStyle    = l.lit ? '#000000' : '#80659a';
+    ctx.font         = 'bold 8px Courier New';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowBlur   = 0;
     ctx.fillText(l.label, l.x, l.y);
   }
   ctx.restore();
 }
 
-// ─────────────────────────── Bumpers ─────────────────────────────────────
+// ─────────────────────────── Bumpers (3-D domes) ─────────────────────────
 function drawBumpers() {
   ctx.save();
   for (const b of BUMPERS) {
     const lit = b.glow > 0;
+    const gf  = b.glow / 14;  // 0..1
 
+    ctx.shadowBlur = 0;
+
+    // ── 1. Extended light halo radiating out when hit ──────────────────
     if (lit) {
       ctx.beginPath();
-      ctx.arc(b.x, b.y, b.r + 7, 0, Math.PI * 2);
-      ctx.fillStyle   = b.color + '35';
-      ctx.shadowColor = b.color;
-      ctx.shadowBlur  = 22;
+      ctx.arc(b.x, b.y, b.r + 22, 0, Math.PI * 2);
+      const halo = ctx.createRadialGradient(b.x, b.y, b.r - 2, b.x, b.y, b.r + 22);
+      halo.addColorStop(0,   hexAlpha(b.color, 0.50 * gf));
+      halo.addColorStop(0.4, hexAlpha(b.color, 0.22 * gf));
+      halo.addColorStop(1,   hexAlpha(b.color, 0));
+      ctx.fillStyle = halo;
       ctx.fill();
     }
 
-    const grad = ctx.createRadialGradient(b.x - 5, b.y - 5, 2, b.x, b.y, b.r);
-    if (lit) {
-      grad.addColorStop(0, '#ffffff');
-      grad.addColorStop(0.5, b.color);
-      grad.addColorStop(1, b.color + '55');
-    } else {
-      grad.addColorStop(0, b.color + '88');
-      grad.addColorStop(1, '#150025');
-    }
+    // ── 2. Cast shadow (makes dome feel raised off the playfield) ──────
+    ctx.beginPath();
+    ctx.ellipse(b.x + 3, b.y + b.r * 0.48, b.r * 0.88, b.r * 0.28, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.48)';
+    ctx.fill();
 
+    // ── 3. Metallic collar ring at the dome base ───────────────────────
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r + 3, 0, Math.PI * 2);
+    const collar = ctx.createRadialGradient(b.x - 3, b.y - 3, b.r * 0.35, b.x, b.y, b.r + 3.5);
+    collar.addColorStop(0,   '#5a5a70');
+    collar.addColorStop(0.6, '#28283a');
+    collar.addColorStop(1,   '#0e0e1a');
+    ctx.fillStyle = collar;
+    ctx.fill();
+
+    // ── 4. Neon indicator ring (bright when hit) ───────────────────────
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r + 1.5, 0, Math.PI * 2);
+    ctx.strokeStyle = lit ? b.color : hexAlpha(b.color, 0.30);
+    ctx.lineWidth   = lit ? 3.5 : 2;
+    ctx.shadowColor = b.color;
+    ctx.shadowBlur  = lit ? 18 * gf + 4 : 2;
+    ctx.stroke();
+    ctx.shadowBlur  = 0;
+
+    // ── 5. Dome body — 3-D sphere gradient ────────────────────────────
     ctx.beginPath();
     ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-    ctx.fillStyle   = grad;
-    ctx.shadowColor = b.color;
-    ctx.shadowBlur  = lit ? 20 : 8;
+    const dome = ctx.createRadialGradient(
+      b.x - b.r * 0.33, b.y - b.r * 0.35, b.r * 0.06,
+      b.x + b.r * 0.08, b.y + b.r * 0.08, b.r
+    );
+    if (lit) {
+      dome.addColorStop(0,    '#ffffff');
+      dome.addColorStop(0.18, lighten(b.color, 0.55));
+      dome.addColorStop(0.52, b.color);
+      dome.addColorStop(0.82, darken(b.color, 0.40));
+      dome.addColorStop(1,    darken(b.color, 0.72));
+    } else {
+      dome.addColorStop(0,    '#b8b8cc');
+      dome.addColorStop(0.22, '#6a6a82');
+      dome.addColorStop(0.55, '#2e2040');
+      dome.addColorStop(0.85, '#160a20');
+      dome.addColorStop(1,    '#070010');
+    }
+    ctx.fillStyle = dome;
     ctx.fill();
-    ctx.strokeStyle = b.color;
-    ctx.lineWidth   = 2;
-    ctx.stroke();
 
-    ctx.fillStyle    = lit ? '#000000' : b.color;
-    ctx.font         = `bold ${b.label.length > 3 ? '7' : '10'}px Courier New`;
+    // ── 6. Primary specular highlight (sharp top-left glint) ──────────
+    const spec1 = ctx.createRadialGradient(
+      b.x - b.r * 0.30, b.y - b.r * 0.33, 0,
+      b.x - b.r * 0.30, b.y - b.r * 0.33, b.r * 0.52
+    );
+    spec1.addColorStop(0,   lit ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.55)');
+    spec1.addColorStop(0.3, lit ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.12)');
+    spec1.addColorStop(1,   'rgba(255,255,255,0)');
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.fillStyle = spec1;
+    ctx.fill();
+
+    // ── 7. Label ───────────────────────────────────────────────────────
+    const fsize = b.label.length > 3 ? 7 : (b.label.length > 2 ? 9 : 11);
+    ctx.font         = `bold ${fsize}px 'Courier New', monospace`;
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
+    ctx.fillStyle    = lit ? '#ffffff' : 'rgba(200,170,240,0.85)';
+    ctx.shadowColor  = lit ? '#ffffff' : 'transparent';
+    ctx.shadowBlur   = lit ? 6 : 0;
+    ctx.fillText(b.label, b.x, b.y + 1);
     ctx.shadowBlur   = 0;
-    ctx.fillText(b.label, b.x, b.y);
   }
   ctx.restore();
 }
 
-// ─────────────────────────── Flipper ─────────────────────────────────────
+// ─────────────────────────── Flippers (3-D tapered rubber) ───────────────
 function drawFlipper(f) {
-  const tx = f.px + FLEN * Math.cos(f.angle);
-  const ty = f.py + FLEN * Math.sin(f.angle);
+  const cos_a = Math.cos(f.angle), sin_a = Math.sin(f.angle);
+  const nx = -sin_a, ny = cos_a;          // normal perpendicular to flipper axis
+  const tx = f.px + FLEN * cos_a;
+  const ty = f.py + FLEN * sin_a;
+
+  // Tapered shape: wider at pivot, narrower at tip
+  const BW = 11, TW = 4.5;
+  const p = [
+    [f.px + nx * BW,  f.py + ny * BW ],   // base, top edge
+    [tx   + nx * TW,  ty   + ny * TW ],   // tip,  top edge
+    [tx   - nx * TW,  ty   - ny * TW ],   // tip,  bottom edge
+    [f.px - nx * BW,  f.py - ny * BW ],   // base, bottom edge
+  ];
+
+  function flipPath() {
+    ctx.beginPath();
+    ctx.moveTo(p[0][0], p[0][1]);
+    ctx.lineTo(p[1][0], p[1][1]);
+    ctx.lineTo(p[2][0], p[2][1]);
+    ctx.lineTo(p[3][0], p[3][1]);
+    ctx.closePath();
+  }
+
   ctx.save();
-  ctx.lineCap     = 'round';
-  ctx.lineWidth   = 14;
-  ctx.strokeStyle = f.pressed ? '#ffd700' : '#ff69b4';
-  ctx.shadowColor = f.pressed ? '#ffd700' : '#ff1493';
-  ctx.shadowBlur  = f.pressed ? 22 : 10;
-  ctx.beginPath();
-  ctx.moveTo(f.px, f.py);
-  ctx.lineTo(tx, ty);
-  ctx.stroke();
-  // Pivot dot
-  ctx.beginPath();
-  ctx.arc(f.px, f.py, 5, 0, Math.PI * 2);
-  ctx.fillStyle   = f.pressed ? '#ffd700' : '#ff1493';
-  ctx.shadowBlur  = 8;
+
+  // ── Drop shadow ────────────────────────────────────────────────────
+  ctx.save();
+  ctx.shadowColor   = 'rgba(0,0,0,0.80)';
+  ctx.shadowBlur    = 8;
+  ctx.shadowOffsetX = 2;
+  ctx.shadowOffsetY = 4;
+  flipPath();
+  ctx.fillStyle = 'rgba(0,0,0,0.001)';  // transparent fill triggers shadow
   ctx.fill();
+  ctx.restore();
+
+  // ── Flipper body — gradient top-to-bottom for 3-D depth ───────────
+  const grad = ctx.createLinearGradient(
+    f.px + nx * BW, f.py + ny * BW,
+    f.px - nx * BW, f.py - ny * BW
+  );
+  if (f.pressed) {
+    grad.addColorStop(0,    '#fff080');   // bright lit edge
+    grad.addColorStop(0.10, '#e8c000');   // gold highlight
+    grad.addColorStop(0.42, '#b09000');   // mid gold
+    grad.addColorStop(0.72, '#6a5200');   // shadow side
+    grad.addColorStop(1,    '#241a00');   // dark underside
+  } else {
+    grad.addColorStop(0,    '#d878f5');   // bright top rim
+    grad.addColorStop(0.10, '#9030b8');   // purple body
+    grad.addColorStop(0.42, '#601888');   // mid shadow
+    grad.addColorStop(0.72, '#350a55');   // dark shadow side
+    grad.addColorStop(1,    '#100020');   // black underside
+  }
+  flipPath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // ── Top-edge highlight (bright rim, physically accurate bevel) ─────
+  ctx.beginPath();
+  ctx.moveTo(p[0][0], p[0][1]);
+  ctx.lineTo(p[1][0], p[1][1]);
+  ctx.strokeStyle = f.pressed ? 'rgba(255,248,160,0.90)' : 'rgba(220,130,255,0.80)';
+  ctx.lineWidth   = 1.8;
+  ctx.shadowColor = f.pressed ? '#ffd700' : '#cc88ff';
+  ctx.shadowBlur  = f.pressed ? 12 : 7;
+  ctx.lineCap     = 'round';
+  ctx.stroke();
+
+  // ── Bottom-edge shadow line ────────────────────────────────────────
+  ctx.beginPath();
+  ctx.moveTo(p[3][0], p[3][1]);
+  ctx.lineTo(p[2][0], p[2][1]);
+  ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+  ctx.lineWidth   = 1.5;
+  ctx.shadowBlur  = 0;
+  ctx.stroke();
+
+  // ── Chrome pivot pin ───────────────────────────────────────────────
+  ctx.beginPath();
+  ctx.arc(f.px, f.py, 7, 0, Math.PI * 2);
+  const pin = ctx.createRadialGradient(f.px - 2.5, f.py - 2.5, 1, f.px, f.py, 7);
+  pin.addColorStop(0,   '#e8e8e8');
+  pin.addColorStop(0.4, '#909090');
+  pin.addColorStop(1,   '#282828');
+  ctx.fillStyle   = pin;
+  ctx.shadowColor = 'rgba(0,0,0,0.7)';
+  ctx.shadowBlur  = 5;
+  ctx.fill();
+
+  // Pin specular glint
+  ctx.beginPath();
+  ctx.arc(f.px - 2, f.py - 2, 2.5, 0, Math.PI * 2);
+  ctx.fillStyle  = 'rgba(255,255,255,0.72)';
+  ctx.shadowBlur = 0;
+  ctx.fill();
+
   ctx.restore();
 }
 
-// ─────────────────────────── Ball ────────────────────────────────────────
+// ─────────────────────────── Ball (chrome metal sphere) ──────────────────
 function drawBall() {
   ctx.save();
-  const g = ctx.createRadialGradient(ball.x - 3, ball.y - 3, 1, ball.x, ball.y, ball.r);
-  g.addColorStop(0, '#ffffff');
-  g.addColorStop(0.5, '#d0d0ff');
-  g.addColorStop(1, '#6060aa');
+
+  // ── 1. Soft drop shadow beneath the ball ─────────────────────────────
+  ctx.beginPath();
+  ctx.ellipse(ball.x + 2, ball.y + ball.r * 0.55, ball.r * 0.84, ball.r * 0.30, 0, 0, Math.PI * 2);
+  ctx.fillStyle  = 'rgba(0,0,0,0.52)';
+  ctx.shadowBlur = 0;
+  ctx.fill();
+
+  // ── 2. Main chrome sphere ─────────────────────────────────────────────
+  // Inner highlight centre is offset upper-left; outer fade is lower-right
+  const chrome = ctx.createRadialGradient(
+    ball.x - ball.r * 0.30, ball.y - ball.r * 0.34, ball.r * 0.04,
+    ball.x + ball.r * 0.10, ball.y + ball.r * 0.10, ball.r
+  );
+  chrome.addColorStop(0,    '#f6f6ff');   // bright specular centre
+  chrome.addColorStop(0.16, '#d8d8f0');   // near-white chrome
+  chrome.addColorStop(0.40, '#9090b8');   // mid chrome
+  chrome.addColorStop(0.65, '#505068');   // dark chrome
+  chrome.addColorStop(0.85, '#282838');   // very dark edge
+  chrome.addColorStop(1,    '#181820');   // near-black rim
+
   ctx.beginPath();
   ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
-  ctx.fillStyle   = g;
-  ctx.shadowColor = '#aaaaff';
-  ctx.shadowBlur  = 14;
+  ctx.fillStyle   = chrome;
+  ctx.shadowColor = 'rgba(170,150,255,0.42)';
+  ctx.shadowBlur  = 12;
   ctx.fill();
+  ctx.shadowBlur  = 0;
+
+  // ── 3. Primary specular highlight (sharp bright glint, upper-left) ───
+  const spec1 = ctx.createRadialGradient(
+    ball.x - ball.r * 0.33, ball.y - ball.r * 0.36, 0,
+    ball.x - ball.r * 0.33, ball.y - ball.r * 0.36, ball.r * 0.44
+  );
+  spec1.addColorStop(0,   'rgba(255,255,255,0.97)');
+  spec1.addColorStop(0.30, 'rgba(255,255,255,0.42)');
+  spec1.addColorStop(1,   'rgba(255,255,255,0)');
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+  ctx.fillStyle = spec1;
+  ctx.fill();
+
+  // ── 4. Soft ambient reflection (bottom, purple table colour tint) ─────
+  const spec2 = ctx.createRadialGradient(
+    ball.x + ball.r * 0.20, ball.y + ball.r * 0.28, 0,
+    ball.x + ball.r * 0.20, ball.y + ball.r * 0.28, ball.r * 0.48
+  );
+  spec2.addColorStop(0, 'rgba(150, 60, 200, 0.28)');
+  spec2.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+  ctx.fillStyle = spec2;
+  ctx.fill();
+
   ctx.restore();
 }
 
@@ -536,16 +860,22 @@ function drawBall() {
 function drawPopups() {
   if (popups.length === 0) return;
   ctx.save();
-  ctx.font      = 'bold 13px Courier New';
   ctx.textAlign = 'center';
   for (const p of popups) {
-    ctx.globalAlpha = p.life / p.maxLife;
+    const a = p.life / p.maxLife;
+    ctx.globalAlpha = a;
+    ctx.font = 'bold 14px Courier New';
+    // Inset text shadow for depth
+    ctx.fillStyle = 'rgba(60,30,0,0.65)';
+    ctx.fillText(p.text, p.x + 1, p.y + 1.5);
+    // Main text
     ctx.fillStyle   = '#ffd700';
     ctx.shadowColor = '#ffd700';
-    ctx.shadowBlur  = 8;
+    ctx.shadowBlur  = 10;
     ctx.fillText(p.text, p.x, p.y);
   }
   ctx.globalAlpha = 1;
+  ctx.shadowBlur  = 0;
   ctx.restore();
 }
 
@@ -553,13 +883,19 @@ function drawPopups() {
 function drawComboHint() {
   if (combo <= 1 || comboTimer <= 0) return;
   ctx.save();
-  ctx.font        = 'bold 12px Courier New';
   ctx.textAlign   = 'center';
+  const a = Math.min(1, comboTimer / 20);
+  ctx.globalAlpha = a;
+  ctx.font        = 'bold 13px Courier New';
+  // Shadow
+  ctx.fillStyle = 'rgba(60,40,0,0.6)';
+  ctx.fillText(`× ${combo} COMBO`, CW / 2 + 1, CH - 21);
+  // Main
   ctx.fillStyle   = '#ffd700';
   ctx.shadowColor = '#ffd700';
-  ctx.shadowBlur  = 10;
-  ctx.globalAlpha = Math.min(1, comboTimer / 20);
+  ctx.shadowBlur  = 12;
   ctx.fillText(`× ${combo} COMBO`, CW / 2, CH - 22);
   ctx.globalAlpha = 1;
+  ctx.shadowBlur  = 0;
   ctx.restore();
 }

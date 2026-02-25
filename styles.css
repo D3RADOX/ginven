@@ -26,11 +26,12 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 5px 10px;
-  background: #0d0018;
-  border: 1px solid #ff1493;
+  padding: 6px 12px;
+  background: linear-gradient(180deg, #1c0030 0%, #110020 100%);
+  border: 1px solid #6020a0;
+  border-bottom: 2px solid #9030d0;
   border-radius: 8px;
-  box-shadow: 0 0 14px #ff149340;
+  box-shadow: 0 0 18px #7010a040, inset 0 1px 0 rgba(200,100,255,0.15);
 }
 
 .hud-block {
@@ -41,15 +42,15 @@ body {
 .hud-label {
   font-size: 9px;
   letter-spacing: 2px;
-  color: #ff69b4aa;
+  color: #9060b0;
   text-transform: uppercase;
 }
 
 .hud-val {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: bold;
   color: #ffd700;
-  text-shadow: 0 0 10px #ffd70080;
+  text-shadow: 0 0 8px #ffd70080, 0 1px 0 rgba(0,0,0,0.8);
   letter-spacing: 1px;
 }
 
@@ -59,18 +60,19 @@ body {
 }
 
 .hud-name {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: bold;
   color: #ff1493;
-  text-shadow: 0 0 10px #ff1493, 0 0 20px #ff149380;
+  text-shadow: 0 0 12px #ff1493, 0 0 24px #ff149860, 0 2px 2px rgba(0,0,0,0.9);
   letter-spacing: 3px;
 }
 
 .hud-sub {
   font-size: 9px;
   color: #ffd700;
-  text-shadow: 0 0 6px #ffd70080;
+  text-shadow: 0 0 6px #ffd70060;
   letter-spacing: 2px;
+  opacity: 0.85;
 }
 
 /* ── Canvas wrapper ──────────────────────────────────────── */
@@ -84,9 +86,14 @@ body {
   width: 100%;
   height: auto;
   display: block;
-  border: 2px solid #ff1493;
-  border-radius: 4px;
-  box-shadow: 0 0 22px #ff149350;
+  /* Chrome rail outer frame — mirrors the inner chrome walls */
+  border: 3px solid #6a2090;
+  border-top: 3px solid #9030c0;
+  border-radius: 6px;
+  box-shadow:
+    0 0 28px #6010a055,
+    0 0  8px #ff149330,
+    inset 0 0 0 1px rgba(180,80,255,0.18);
   touch-action: none;
 }
 
@@ -106,16 +113,21 @@ body {
 .overlay-box {
   text-align: center;
   padding: 28px 36px;
-  border: 2px solid #ffd700;
+  border: 2px solid #9a7000;
+  border-top: 2px solid #ffd700;
   border-radius: 14px;
-  background: #0d0018;
-  box-shadow: 0 0 30px #ffd70060, inset 0 0 20px #1a0030;
+  background: linear-gradient(160deg, #1c0030 0%, #0a000f 100%);
+  box-shadow:
+    0 0 40px #ffd70050,
+    0 0 10px #ff149330,
+    inset 0 1px 0 rgba(255,215,0,0.25),
+    inset 0 0 30px #1a0030;
 }
 
 .overlay-box h2 {
   font-size: 26px;
   color: #ffd700;
-  text-shadow: 0 0 14px #ffd700;
+  text-shadow: 0 0 14px #ffd700, 0 2px 3px rgba(0,0,0,0.9);
   letter-spacing: 4px;
   margin-bottom: 14px;
 }
@@ -153,9 +165,10 @@ body {
 
 .flip-btn {
   flex: 1;
-  background: #150020;
-  color: #ff69b4;
-  border: 1px solid #ff1493;
+  background: linear-gradient(180deg, #220035 0%, #130020 100%);
+  color: #cc80ee;
+  border: 1px solid #5a1888;
+  border-top: 1px solid #8030c0;
   padding: 15px 8px;
   font-size: 14px;
   font-family: inherit;
@@ -164,15 +177,16 @@ body {
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  box-shadow: 0 0 10px #ff149330;
-  transition: background 0.08s, box-shadow 0.08s;
+  box-shadow: 0 0 10px #50108030, 0 3px 6px rgba(0,0,0,0.6);
+  transition: background 0.07s, box-shadow 0.07s, color 0.07s;
 }
 
 .flip-btn:active,
 .flip-btn.pressed {
-  background: #ff1493;
-  color: #fff;
-  box-shadow: 0 0 20px #ff149390;
+  background: linear-gradient(180deg, #ffd700 0%, #c8a000 100%);
+  color: #1a0a00;
+  border-color: #ffd700;
+  box-shadow: 0 0 22px #ffd70080, 0 2px 4px rgba(0,0,0,0.5);
 }
 
 /* ── Hint ────────────────────────────────────────────────── */
