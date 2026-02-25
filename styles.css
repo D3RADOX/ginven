@@ -1,60 +1,185 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-  font-family: Arial, sans-serif;
-  background: #f4f4f4;
-  margin: 0;
-  padding: 2rem;
+  background: #050008;
+  color: #ff69b4;
+  font-family: 'Courier New', monospace;
+  display: flex;
+  justify-content: center;
+  min-height: 100dvh;
+  overflow-x: hidden;
 }
 
-main {
-  background: #fff;
-  padding: 2rem;
-  max-width: 600px;
-  margin: auto;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
-  border-radius: 10px;
-}
-
-form {
+#wrapper {
+  width: 100%;
+  max-width: 400px;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  align-items: center;
+  padding: 6px 4px;
+  gap: 5px;
 }
 
-input {
-  padding: 0.75rem;
-  font-size: 1rem;
-  border: 1px solid #ccc;
+/* ── HUD ─────────────────────────────────────────────────── */
+#hud {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 10px;
+  background: #0d0018;
+  border: 1px solid #ff1493;
   border-radius: 8px;
+  box-shadow: 0 0 14px #ff149340;
 }
 
-button {
-  padding: 0.75rem;
-  font-size: 1rem;
-  background: #111;
-  color: white;
+.hud-block {
+  text-align: center;
+  min-width: 68px;
+}
+
+.hud-label {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: #ff69b4aa;
+  text-transform: uppercase;
+}
+
+.hud-val {
+  font-size: 22px;
+  font-weight: bold;
+  color: #ffd700;
+  text-shadow: 0 0 10px #ffd70080;
+  letter-spacing: 1px;
+}
+
+#hud-title {
+  text-align: center;
+  flex: 1;
+}
+
+.hud-name {
+  font-size: 16px;
+  font-weight: bold;
+  color: #ff1493;
+  text-shadow: 0 0 10px #ff1493, 0 0 20px #ff149380;
+  letter-spacing: 3px;
+}
+
+.hud-sub {
+  font-size: 9px;
+  color: #ffd700;
+  text-shadow: 0 0 6px #ffd70080;
+  letter-spacing: 2px;
+}
+
+/* ── Canvas wrapper ──────────────────────────────────────── */
+#canvas-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+}
+
+#c {
+  width: 100%;
+  height: auto;
+  display: block;
+  border: 2px solid #ff1493;
+  border-radius: 4px;
+  box-shadow: 0 0 22px #ff149350;
+  touch-action: none;
+}
+
+/* ── Overlay ─────────────────────────────────────────────── */
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 0, 10, 0.88);
+  border-radius: 4px;
+}
+
+#overlay.hidden { display: none; }
+
+.overlay-box {
+  text-align: center;
+  padding: 28px 36px;
+  border: 2px solid #ffd700;
+  border-radius: 14px;
+  background: #0d0018;
+  box-shadow: 0 0 30px #ffd70060, inset 0 0 20px #1a0030;
+}
+
+.overlay-box h2 {
+  font-size: 26px;
+  color: #ffd700;
+  text-shadow: 0 0 14px #ffd700;
+  letter-spacing: 4px;
+  margin-bottom: 14px;
+}
+
+#ov-score {
+  font-size: 16px;
+  color: #ff69b4;
+  margin-bottom: 22px;
+  line-height: 1.6;
+}
+
+#ov-btn {
+  background: #ff1493;
+  color: #fff;
   border: none;
+  padding: 12px 32px;
+  font-size: 15px;
+  font-family: inherit;
+  letter-spacing: 2px;
   border-radius: 8px;
   cursor: pointer;
+  box-shadow: 0 0 16px #ff149360;
+  transition: transform 0.1s;
 }
 
-button:hover {
-  background: #333;
-}
+#ov-btn:active { transform: scale(0.95); }
 
-#inventory-list {
-  margin-top: 2rem;
-  padding-left: 0;
-  list-style: none;
-}
-
-#inventory-list li {
-  padding: 0.5rem;
-  border-bottom: 1px solid #ccc;
-}
-
-.export-buttons {
-  margin-top: 2rem;
+/* ── Flipper buttons ─────────────────────────────────────── */
+#flip-row {
+  width: 100%;
+  max-width: 360px;
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  gap: 8px;
+}
+
+.flip-btn {
+  flex: 1;
+  background: #150020;
+  color: #ff69b4;
+  border: 1px solid #ff1493;
+  padding: 15px 8px;
+  font-size: 14px;
+  font-family: inherit;
+  letter-spacing: 2px;
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow: 0 0 10px #ff149330;
+  transition: background 0.08s, box-shadow 0.08s;
+}
+
+.flip-btn:active,
+.flip-btn.pressed {
+  background: #ff1493;
+  color: #fff;
+  box-shadow: 0 0 20px #ff149390;
+}
+
+/* ── Hint ────────────────────────────────────────────────── */
+#hint {
+  font-size: 9px;
+  color: #ffffff35;
+  text-align: center;
+  letter-spacing: 1px;
+  padding-bottom: 4px;
 }
