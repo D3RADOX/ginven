@@ -17,6 +17,11 @@ let gameRunning = false;
 let ballActive  = false;
 let combo       = 1;
 let comboTimer  = 0;
+let time        = 0;          // global frame counter for animations
+
+// ─────────────────────────── Animation state ─────────────────────────────
+const ballTrail = [];         // last N ball positions for motion trail
+const sparkles  = [];         // drifting sparkle particles
 
 // ─────────────────────────── Ball ────────────────────────────────────────
 const ball = { x: CW / 2, y: 100, vx: 0, vy: 0, r: 9 };
@@ -168,6 +173,7 @@ function launchBall() {
 function drainBall() {
   if (!ballActive) return;
   ballActive = false;
+  ballTrail.length = 0;
   ballsLeft--;
   updateHUD();
   if (ballsLeft <= 0) {
@@ -186,7 +192,12 @@ function endGame() {
 }
 
 function updateHUD() {
-  document.getElementById('score-el').textContent = score.toLocaleString();
+  const el = document.getElementById('score-el');
+  el.textContent = score.toLocaleString();
+  // Flash the score element on each update
+  el.classList.remove('pop');
+  void el.offsetWidth;   // force reflow to restart animation
+  el.classList.add('pop');
   document.getElementById('balls-el').textContent = ballsLeft;
 }
 
@@ -203,8 +214,13 @@ function loop() {
 //  UPDATE
 // ═════════════════════════════════════════════════════════════════════════
 function update() {
+  time++;
+
   // Combo timer decay
   if (comboTimer > 0 && --comboTimer === 0) combo = 1;
+
+  // Sparkles animate every frame regardless of ball state
+  updateSparkles();
 
   // Animate flippers even when ball is not active (visual feedback)
   moveFlipper(LF);
@@ -221,6 +237,10 @@ function update() {
   }
   ball.x += ball.vx;
   ball.y += ball.vy;
+
+  // ── Ball trail ─────────────────────────────────────────────────────────
+  ballTrail.push({ x: ball.x, y: ball.y });
+  if (ballTrail.length > 15) ballTrail.shift();
 
   // ── Side & top walls ───────────────────────────────────────────────────
   if (ball.x - ball.r < 10)       { ball.x = 10 + ball.r;        ball.vx =  Math.abs(ball.vx) * 0.82; }
@@ -361,6 +381,78 @@ function addScore(pts, x, y) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════
+//  SPARKLE SYSTEM
+// ═════════════════════════════════════════════════════════════════════════
+const SPARK_PAL = [
+  '#ffd700','#ff1493','#ff69b4','#da70d6',
+  '#ffffff','#cc44ff','#ff8800','#00ddff','#ff44aa',
+];
+
+function spawnSparkle() {
+  sparkles.push({
+    x:       22 + Math.random() * (CW - 44),
+    y:       55 + Math.random() * (CH - 170),
+    vx:      (Math.random() - 0.5) * 0.55,
+    vy:      -0.22 - Math.random() * 0.55,
+    r:       0.8 + Math.random() * 2.4,
+    color:   SPARK_PAL[Math.floor(Math.random() * SPARK_PAL.length)],
+    life:    0,
+    maxLife: 85 + Math.floor(Math.random() * 90),
+    phase:   Math.random() * Math.PI * 2,
+    star:    Math.random() < 0.45,
+  });
+}
+
+function updateSparkles() {
+  if (sparkles.length < 50 && Math.random() < 0.55) spawnSparkle();
+  for (let i = sparkles.length - 1; i >= 0; i--) {
+    const s = sparkles[i];
+    s.x += s.vx;
+    s.y += s.vy;
+    s.life++;
+    if (s.life >= s.maxLife) sparkles.splice(i, 1);
+  }
+}
+
+function drawSparkles() {
+  ctx.save();
+  for (const s of sparkles) {
+    const fadeIn  = Math.min(1, s.life / 12);
+    const fadeOut = Math.max(0, 1 - (s.life - s.maxLife * 0.62) / (s.maxLife * 0.38));
+    const twinkle = 0.42 + 0.58 * Math.sin(time * 0.20 + s.phase);
+    const alpha   = fadeIn * fadeOut * twinkle;
+    if (alpha < 0.02) continue;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle   = s.color;
+    ctx.shadowColor = s.color;
+    ctx.shadowBlur  = 7;
+    ctx.beginPath();
+    if (s.star) {
+      drawStar4(s.x, s.y, s.r * 1.5);
+    } else {
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur  = 0;
+  ctx.restore();
+}
+
+function drawStar4(x, y, r) {
+  const s = r * 0.38;
+  ctx.moveTo(x,     y - r);
+  ctx.lineTo(x + s, y - s);
+  ctx.lineTo(x + r, y    );
+  ctx.lineTo(x + s, y + s);
+  ctx.lineTo(x,     y + r);
+  ctx.lineTo(x - s, y + s);
+  ctx.lineTo(x - r, y    );
+  ctx.lineTo(x - s, y - s);
+  ctx.closePath();
+}
+
+// ═════════════════════════════════════════════════════════════════════════
 //  COLOR HELPERS
 // ═════════════════════════════════════════════════════════════════════════
 
@@ -451,17 +543,175 @@ function getFieldCanvas() {
 //  DRAW
 // ═════════════════════════════════════════════════════════════════════════
 function draw() {
-  // Playfield texture (pre-rendered, drawn once per frame as background)
   ctx.drawImage(getFieldCanvas(), 0, 0);
-
+  drawAnimatedBackground();
+  drawMarqueeLights();
   drawWalls();
+  drawSparkles();
+  drawNeonSign();
   drawLanes();
   drawBumpers();
+  drawStageFootlights();
+  drawBallTrail();
   drawFlipper(LF);
   drawFlipper(RF);
   if (ballActive) drawBall();
   drawPopups();
   drawComboHint();
+}
+
+// ─────────────────────────── Sweeping spotlights ─────────────────────────
+function drawAnimatedBackground() {
+  ctx.save();
+  const sp = 0.68 + 0.32 * Math.sin(time * 0.025);
+
+  // Spotlight 1 — pink/magenta, sweeps left-right
+  const sx = CW / 2 + Math.sin(time * 0.0065) * 105;
+  const sy = CH * 0.32;
+  const s1 = ctx.createRadialGradient(sx, sy, 0, sx, sy, 210);
+  s1.addColorStop(0,   `rgba(180,0,120,${(0.20 * sp).toFixed(3)})`);
+  s1.addColorStop(0.5, `rgba(110,0,75, ${(0.08 * sp).toFixed(3)})`);
+  s1.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = s1;
+  ctx.fillRect(0, 0, CW, CH);
+
+  // Spotlight 2 — blue/indigo, counter-sweeps
+  const sx2 = CW / 2 + Math.cos(time * 0.0065) * 90;
+  const sy2 = CH * 0.50;
+  const s2 = ctx.createRadialGradient(sx2, sy2, 0, sx2, sy2, 165);
+  s2.addColorStop(0,   `rgba(0,20,140,${(0.14 * sp).toFixed(3)})`);
+  s2.addColorStop(0.5, `rgba(0,10,90, ${(0.06 * sp).toFixed(3)})`);
+  s2.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = s2;
+  ctx.fillRect(0, 0, CW, CH);
+
+  ctx.restore();
+}
+
+// ─────────────────────────── Marquee / border chase lights ───────────────
+function drawMarqueeLights() {
+  ctx.save();
+  const PAL   = ['#ff1493','#ffd700','#da70d6','#ff69b4','#cc22ff','#ff8800','#00ccff','#ff4488'];
+  const SPEED = 4;  // frames per color step
+
+  // ── Top horizontal marquee row ─────────────────────────────────────────
+  for (let x = 18; x <= 342; x += 18) {
+    const idx   = (((time / SPEED) | 0) + ((x / 18) | 0)) % PAL.length;
+    const color = PAL[(idx + PAL.length) % PAL.length];
+    const pulse = 0.55 + 0.45 * Math.sin(time * 0.22 + x * 0.09);
+    ctx.beginPath();
+    ctx.arc(x, 36, 3.2, 0, Math.PI * 2);
+    ctx.fillStyle   = color;
+    ctx.globalAlpha = 0.55 + 0.40 * pulse;
+    ctx.shadowColor = color;
+    ctx.shadowBlur  = 10 * pulse;
+    ctx.fill();
+  }
+
+  // ── Left wall chase lights ─────────────────────────────────────────────
+  for (let j = 0, y = 68; y < 490; y += 28, j++) {
+    const idx   = (((time / SPEED) | 0) + j + 2) % PAL.length;
+    const color = PAL[idx];
+    const pulse = 0.55 + 0.45 * Math.sin(time * 0.15 + y * 0.055);
+    ctx.beginPath();
+    ctx.arc(14, y, 2.6, 0, Math.PI * 2);
+    ctx.fillStyle   = color;
+    ctx.globalAlpha = 0.50 + 0.42 * pulse;
+    ctx.shadowColor = color;
+    ctx.shadowBlur  = 8 * pulse;
+    ctx.fill();
+  }
+
+  // ── Right wall chase lights (reverse direction for mirror effect) ───────
+  for (let j = 0, y = 68; y < 490; y += 28, j++) {
+    const idx   = ((((time / SPEED) | 0) - j) % PAL.length + PAL.length * 4 + 5) % PAL.length;
+    const color = PAL[idx];
+    const pulse = 0.55 + 0.45 * Math.sin(time * 0.15 + y * 0.055 + Math.PI);
+    ctx.beginPath();
+    ctx.arc(346, y, 2.6, 0, Math.PI * 2);
+    ctx.fillStyle   = color;
+    ctx.globalAlpha = 0.50 + 0.42 * pulse;
+    ctx.shadowColor = color;
+    ctx.shadowBlur  = 8 * pulse;
+    ctx.fill();
+  }
+
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur  = 0;
+  ctx.restore();
+}
+
+// ─────────────────────────── Neon sign ───────────────────────────────────
+function drawNeonSign() {
+  ctx.save();
+  const pulse   = 0.60 + 0.40 * Math.sin(time * 0.055);
+  // Rare flicker: ~2% of frames go dark for 1 frame
+  const flicker = Math.sin(time * 0.53) > 0.97 ? 0.15 : 1;
+  ctx.globalAlpha    = pulse * flicker;
+  ctx.textAlign      = 'center';
+  ctx.textBaseline   = 'middle';
+  ctx.font           = 'bold 10px Courier New';
+
+  // Outer bloom pass
+  ctx.fillStyle   = '#ff1493';
+  ctx.shadowColor = '#ff1493';
+  ctx.shadowBlur  = 22;
+  ctx.fillText('♦  VIP  DIAMONDS  ♦', CW / 2, 102);
+
+  // Inner bright pass
+  ctx.fillStyle  = '#ffaad0';
+  ctx.shadowBlur = 5;
+  ctx.fillText('♦  VIP  DIAMONDS  ♦', CW / 2, 102);
+
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur  = 0;
+  ctx.restore();
+}
+
+// ─────────────────────────── Stage footlights ────────────────────────────
+function drawStageFootlights() {
+  ctx.save();
+  const pulse = 0.60 + 0.40 * Math.sin(time * 0.08);
+
+  for (const f of [LF, RF]) {
+    const g = ctx.createRadialGradient(f.px, f.py, 0, f.px, f.py, 80);
+    g.addColorStop(0, `rgba(255,100,180,${(0.24 * pulse).toFixed(3)})`);
+    g.addColorStop(1, 'rgba(255,20,147,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(f.px, f.py, 80, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Horizontal glow strip across the flipper zone
+  const fy    = LF.py;
+  const strip = ctx.createLinearGradient(0, fy - 28, 0, fy + 18);
+  strip.addColorStop(0, `rgba(255,20,147,${(0.08 * pulse).toFixed(3)})`);
+  strip.addColorStop(1, 'rgba(255,20,147,0)');
+  ctx.fillStyle = strip;
+  ctx.fillRect(10, fy - 28, CW - 20, 46);
+
+  ctx.restore();
+}
+
+// ─────────────────────────── Ball motion trail ───────────────────────────
+function drawBallTrail() {
+  if (ballTrail.length < 2) return;
+  ctx.save();
+  for (let i = 0; i < ballTrail.length; i++) {
+    const pct = i / ballTrail.length;
+    const r   = ball.r * pct * 0.75;
+    if (r < 0.5) continue;
+    const t = ballTrail[i];
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, r, 0, Math.PI * 2);
+    ctx.fillStyle   = `rgba(180,120,255,${(pct * 0.52).toFixed(3)})`;
+    ctx.shadowColor = '#aa55ff';
+    ctx.shadowBlur  = 9 * pct;
+    ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+  ctx.restore();
 }
 
 // ─────────────────────────── Walls & chrome rails ────────────────────────
@@ -551,6 +801,7 @@ function drawLanes() {
     ctx.stroke();
 
     // Lens body
+    const lIdlePulse = 0.35 + 0.30 * Math.sin(time * 0.06 + l.x * 0.025);
     ctx.beginPath();
     ctx.arc(l.x, l.y, l.r, 0, Math.PI * 2);
     if (l.lit) {
@@ -566,8 +817,10 @@ function drawLanes() {
       ctx.shadowColor = '#ffd700';
       ctx.shadowBlur  = 20;
     } else {
-      ctx.fillStyle = '#12102a';
-      ctx.shadowBlur = 0;
+      // Idle: very dim gold pulse so unlit inserts feel alive
+      ctx.fillStyle   = `rgba(80,55,0,${(lIdlePulse * 0.55).toFixed(3)})`;
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur  = 5 * lIdlePulse;
     }
     ctx.fill();
 
@@ -634,13 +887,14 @@ function drawBumpers() {
     ctx.fillStyle = collar;
     ctx.fill();
 
-    // ── 4. Neon indicator ring (bright when hit) ───────────────────────
+    // ── 4. Neon indicator ring (bright when hit, pulses idle) ─────────
+    const idlePulse = 0.22 + 0.18 * Math.sin(time * 0.042 + b.x * 0.018 + b.y * 0.012);
     ctx.beginPath();
     ctx.arc(b.x, b.y, b.r + 1.5, 0, Math.PI * 2);
-    ctx.strokeStyle = lit ? b.color : hexAlpha(b.color, 0.30);
+    ctx.strokeStyle = lit ? b.color : hexAlpha(b.color, 0.28 + idlePulse);
     ctx.lineWidth   = lit ? 3.5 : 2;
     ctx.shadowColor = b.color;
-    ctx.shadowBlur  = lit ? 18 * gf + 4 : 2;
+    ctx.shadowBlur  = lit ? 18 * gf + 4 : 5 * idlePulse * 2;
     ctx.stroke();
     ctx.shadowBlur  = 0;
 

@@ -1,5 +1,40 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── Neon flicker for the sign title ────────────────────────────────────── */
+@keyframes neonFlicker {
+  0%,18%,20%,22%,48%,50%,100% {
+    text-shadow: 0 0 12px #ff1493, 0 0 28px #ff149880, 0 2px 2px rgba(0,0,0,0.9);
+    opacity: 1;
+  }
+  19%,21% {
+    text-shadow: none;
+    opacity: 0.6;
+  }
+  49% {
+    text-shadow: 0 0 4px #ff1493;
+    opacity: 0.75;
+  }
+}
+
+/* ── Canvas border pulse ─────────────────────────────────────────────────── */
+@keyframes borderPulse {
+  0%, 100% {
+    box-shadow: 0 0 28px #6010a055, 0 0 8px #ff149330,
+                inset 0 0 0 1px rgba(180,80,255,0.18);
+  }
+  50% {
+    box-shadow: 0 0 40px #9020d070, 0 0 16px #ff149355,
+                inset 0 0 0 1px rgba(220,100,255,0.35);
+  }
+}
+
+/* ── Score value pop ─────────────────────────────────────────────────────── */
+@keyframes scorePop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.18); color: #ffffff; }
+  100% { transform: scale(1); }
+}
+
 body {
   background: #050008;
   color: #ff69b4;
@@ -52,6 +87,11 @@ body {
   color: #ffd700;
   text-shadow: 0 0 8px #ffd70080, 0 1px 0 rgba(0,0,0,0.8);
   letter-spacing: 1px;
+  display: inline-block;  /* needed for transform on score pop */
+}
+
+.hud-val.pop {
+  animation: scorePop 0.25s ease-out;
 }
 
 #hud-title {
@@ -63,8 +103,8 @@ body {
   font-size: 17px;
   font-weight: bold;
   color: #ff1493;
-  text-shadow: 0 0 12px #ff1493, 0 0 24px #ff149860, 0 2px 2px rgba(0,0,0,0.9);
   letter-spacing: 3px;
+  animation: neonFlicker 7s infinite;
 }
 
 .hud-sub {
@@ -86,15 +126,11 @@ body {
   width: 100%;
   height: auto;
   display: block;
-  /* Chrome rail outer frame — mirrors the inner chrome walls */
   border: 3px solid #6a2090;
   border-top: 3px solid #9030c0;
   border-radius: 6px;
-  box-shadow:
-    0 0 28px #6010a055,
-    0 0  8px #ff149330,
-    inset 0 0 0 1px rgba(180,80,255,0.18);
   touch-action: none;
+  animation: borderPulse 3s ease-in-out infinite;
 }
 
 /* ── Overlay ─────────────────────────────────────────────── */
