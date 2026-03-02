@@ -3,25 +3,264 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Inventory Exporter</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>AGI DJ — NEURAL CORE</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <main>
-    <h1>Inventory Entry</h1>
-    <form id="inventory-form">
-      <input type="text" id="item-name" placeholder="Item name" required />
-      <input type="number" id="item-quantity" placeholder="Quantity" min="1" required />
-      <button type="submit">Add Item</button>
-    </form>
 
-    <ul id="inventory-list"></ul>
+  <!-- Background canvas for neural net animation -->
+  <canvas id="neural-bg"></canvas>
 
-    <div class="export-buttons">
-      <button onclick="exportAsExcel()">Export as XLSX</button>
-      <button onclick="exportAsDoc()">Export as DOC</button>
-      <button onclick="exportAsHTML()">Export as HTML</button>
+  <!-- Scanline overlay -->
+  <div class="scanlines"></div>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-left">
+      <span class="logo-tag">AGI</span>
+      <span class="logo-sub">NEURAL DJ CORE v4.7</span>
     </div>
+    <div class="header-center">
+      <div class="bpm-display">
+        <span class="bpm-label">BPM</span>
+        <span id="bpm-value" class="bpm-number">128</span>
+        <div class="bpm-controls">
+          <button class="bpm-btn" id="bpm-down">−</button>
+          <button class="bpm-btn" id="bpm-up">+</button>
+        </div>
+      </div>
+      <div class="master-clock">
+        <div class="beat-indicator" id="beat-indicator"></div>
+        <span class="clock-label">SYNC MASTER</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="status-row">
+        <span class="status-dot active"></span>
+        <span class="status-text">AGI ONLINE</span>
+      </div>
+      <div class="status-row">
+        <span class="status-dot pulse"></span>
+        <span class="status-text">NEURAL SYNC</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN INTERFACE -->
+  <main class="dj-interface">
+
+    <!-- DECK A -->
+    <section class="deck deck-a">
+      <div class="deck-header">
+        <span class="deck-label">DECK A</span>
+        <div class="deck-meta">
+          <span class="track-name" id="track-a-name">VOID_SIGNAL.wav</span>
+          <span class="track-time" id="track-a-time">0:00</span>
+        </div>
+      </div>
+
+      <div class="waveform-container">
+        <canvas class="waveform" id="waveform-a"></canvas>
+        <div class="playhead" id="playhead-a"></div>
+      </div>
+
+      <div class="turntable-zone">
+        <div class="turntable" id="turntable-a">
+          <div class="platter">
+            <div class="groove-ring r1"></div>
+            <div class="groove-ring r2"></div>
+            <div class="groove-ring r3"></div>
+            <div class="groove-ring r4"></div>
+            <div class="center-label">
+              <span>A</span>
+            </div>
+          </div>
+        </div>
+        <div class="pitch-fader-zone">
+          <span class="fader-label">PITCH</span>
+          <input type="range" class="pitch-fader" id="pitch-a" min="-8" max="8" value="0" step="0.1" orient="vertical" />
+          <span class="pitch-val" id="pitch-a-val">0.0%</span>
+        </div>
+      </div>
+
+      <div class="deck-controls">
+        <button class="ctrl-btn cue" id="cue-a">CUE</button>
+        <button class="ctrl-btn play" id="play-a">&#9654;</button>
+        <button class="ctrl-btn sync" id="sync-a">SYNC</button>
+      </div>
+
+      <div class="eq-strip">
+        <div class="eq-band">
+          <span class="eq-label">HI</span>
+          <input type="range" class="eq-knob" id="eq-hi-a" min="0" max="100" value="75" orient="vertical" />
+        </div>
+        <div class="eq-band">
+          <span class="eq-label">MID</span>
+          <input type="range" class="eq-knob" id="eq-mid-a" min="0" max="100" value="75" orient="vertical" />
+        </div>
+        <div class="eq-band">
+          <span class="eq-label">LO</span>
+          <input type="range" class="eq-knob" id="eq-lo-a" min="0" max="100" value="75" orient="vertical" />
+        </div>
+        <div class="eq-band">
+          <span class="eq-label">VOL</span>
+          <input type="range" class="eq-knob vol-knob" id="vol-a" min="0" max="100" value="80" orient="vertical" />
+        </div>
+      </div>
+
+      <div class="fx-row">
+        <button class="fx-btn" data-deck="a" data-fx="echo">ECHO</button>
+        <button class="fx-btn" data-deck="a" data-fx="filter">FILTER</button>
+        <button class="fx-btn" data-deck="a" data-fx="reverb">REVERB</button>
+        <button class="fx-btn" data-deck="a" data-fx="flange">FLANGE</button>
+      </div>
+    </section>
+
+    <!-- CENTER MIXER -->
+    <section class="mixer">
+      <!-- Spectrum Visualizer -->
+      <div class="visualizer-block">
+        <canvas id="spectrum" class="spectrum-canvas"></canvas>
+        <div class="viz-label">NEURAL SPECTRUM</div>
+      </div>
+
+      <!-- Crossfader -->
+      <div class="crossfader-zone">
+        <span class="cf-label">A</span>
+        <div class="cf-track">
+          <input type="range" id="crossfader" min="0" max="100" value="50" class="crossfader" />
+          <div class="cf-indicators">
+            <div class="cf-pip"></div>
+            <div class="cf-pip"></div>
+            <div class="cf-pip"></div>
+            <div class="cf-pip"></div>
+            <div class="cf-pip"></div>
+          </div>
+        </div>
+        <span class="cf-label">B</span>
+      </div>
+
+      <!-- Master volume -->
+      <div class="master-vol-zone">
+        <span class="mv-label">MASTER</span>
+        <input type="range" id="master-vol" min="0" max="100" value="85" class="master-vol-slider" />
+        <span class="mv-val" id="master-vol-val">85</span>
+      </div>
+
+      <!-- Beat pad -->
+      <div class="beat-pad-grid">
+        <div class="pad-row-label">PADS</div>
+        <div class="pad-grid">
+          <button class="pad" data-note="kick">&#9642;</button>
+          <button class="pad" data-note="snare">&#9642;</button>
+          <button class="pad" data-note="hat">&#9642;</button>
+          <button class="pad" data-note="open-hat">&#9642;</button>
+          <button class="pad" data-note="bass">&#9642;</button>
+          <button class="pad" data-note="chord">&#9642;</button>
+          <button class="pad" data-note="lead">&#9642;</button>
+          <button class="pad" data-note="fx">&#9642;</button>
+          <button class="pad" data-note="perc1">&#9642;</button>
+          <button class="pad" data-note="perc2">&#9642;</button>
+          <button class="pad" data-note="rise">&#9642;</button>
+          <button class="pad" data-note="drop">&#9642;</button>
+          <button class="pad" data-note="sweep">&#9642;</button>
+          <button class="pad" data-note="noise">&#9642;</button>
+          <button class="pad" data-note="vox1">&#9642;</button>
+          <button class="pad" data-note="vox2">&#9642;</button>
+        </div>
+      </div>
+
+      <!-- AGI signal meter -->
+      <div class="agi-meter">
+        <span class="agi-meter-label">AGI SIGNAL</span>
+        <div class="agi-bars" id="agi-bars">
+          <div class="agi-bar"></div>
+          <div class="agi-bar"></div>
+          <div class="agi-bar"></div>
+          <div class="agi-bar"></div>
+          <div class="agi-bar"></div>
+          <div class="agi-bar"></div>
+          <div class="agi-bar"></div>
+          <div class="agi-bar"></div>
+          <div class="agi-bar"></div>
+          <div class="agi-bar"></div>
+          <div class="agi-bar"></div>
+          <div class="agi-bar"></div>
+          <div class="agi-bar"></div>
+          <div class="agi-bar"></div>
+          <div class="agi-bar"></div>
+          <div class="agi-bar"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DECK B -->
+    <section class="deck deck-b">
+      <div class="deck-header">
+        <span class="deck-label">DECK B</span>
+        <div class="deck-meta">
+          <span class="track-name" id="track-b-name">HYPERNET_FLUX.wav</span>
+          <span class="track-time" id="track-b-time">0:00</span>
+        </div>
+      </div>
+
+      <div class="waveform-container">
+        <canvas class="waveform" id="waveform-b"></canvas>
+        <div class="playhead" id="playhead-b"></div>
+      </div>
+
+      <div class="turntable-zone">
+        <div class="pitch-fader-zone">
+          <span class="fader-label">PITCH</span>
+          <input type="range" class="pitch-fader" id="pitch-b" min="-8" max="8" value="0" step="0.1" orient="vertical" />
+          <span class="pitch-val" id="pitch-b-val">0.0%</span>
+        </div>
+        <div class="turntable" id="turntable-b">
+          <div class="platter">
+            <div class="groove-ring r1"></div>
+            <div class="groove-ring r2"></div>
+            <div class="groove-ring r3"></div>
+            <div class="groove-ring r4"></div>
+            <div class="center-label">
+              <span>B</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="deck-controls">
+        <button class="ctrl-btn sync" id="sync-b">SYNC</button>
+        <button class="ctrl-btn play" id="play-b">&#9654;</button>
+        <button class="ctrl-btn cue" id="cue-b">CUE</button>
+      </div>
+
+      <div class="eq-strip">
+        <div class="eq-band">
+          <span class="eq-label">HI</span>
+          <input type="range" class="eq-knob" id="eq-hi-b" min="0" max="100" value="75" orient="vertical" />
+        </div>
+        <div class="eq-band">
+          <span class="eq-label">MID</span>
+          <input type="range" class="eq-knob" id="eq-mid-b" min="0" max="100" value="75" orient="vertical" />
+        </div>
+        <div class="eq-band">
+          <span class="eq-label">LO</span>
+          <input type="range" class="eq-knob" id="eq-lo-b" min="0" max="100" value="75" orient="vertical" />
+        </div>
+        <div class="eq-band">
+          <span class="eq-label">VOL</span>
+          <input type="range" class="eq-knob vol-knob" id="vol-b" min="0" max="100" value="80" orient="vertical" />
+        </div>
+      </div>
+
+      <div class="fx-row">
+        <button class="fx-btn" data-deck="b" data-fx="echo">ECHO</button>
+        <button class="fx-btn" data-deck="b" data-fx="filter">FILTER</button>
+        <button class="fx-btn" data-deck="b" data-fx="reverb">REVERB</button>
+        <button class="fx-btn" data-deck="b" data-fx="flange">FLANGE</button>
+      </div>
+    </section>
+
   </main>
 
   <script src="script.js"></script>
