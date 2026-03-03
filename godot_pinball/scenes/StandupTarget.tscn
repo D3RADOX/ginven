@@ -1,0 +1,28 @@
+[gd_scene load_steps=4 format=3 uid="uid://standup_scene"]
+
+[ext_resource type="Script" path="res://scripts/standup_target.gd" id="1_standup"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(8, 30)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_detect"]
+size = Vector2(18, 34)
+
+[node name="StandupTarget" type="Node2D"]
+script = ExtResource("1_standup")
+side = "left"
+index = 0
+
+[node name="Body" type="StaticBody2D" parent="."]
+collision_layer = 2
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Body"]
+shape = SubResource("RectangleShape2D_body")
+
+[node name="DetectArea" type="Area2D" parent="."]
+collision_layer = 32
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="DetectArea"]
+shape = SubResource("RectangleShape2D_detect")

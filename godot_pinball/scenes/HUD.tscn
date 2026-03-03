@@ -1,0 +1,94 @@
+[gd_scene load_steps=2 format=3 uid="uid://hud_scene"]
+
+[ext_resource type="Script" path="res://scripts/hud.gd" id="1_hud"]
+
+[node name="HUD" type="CanvasLayer"]
+script = ExtResource("1_hud")
+
+[node name="ScoreLabel" type="Label" parent="."]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -120.0
+offset_top = 8.0
+offset_right = 120.0
+offset_bottom = 52.0
+text = "0"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 38
+
+[node name="BallsLabel" type="Label" parent="."]
+anchors_preset = 0
+offset_left = 8.0
+offset_top = 10.0
+offset_right = 140.0
+offset_bottom = 38.0
+text = "BALL 1"
+theme_override_font_sizes/font_size = 16
+
+[node name="MultLabel" type="Label" parent="."]
+anchors_preset = 1
+anchor_right = 1.0
+offset_left = -100.0
+offset_top = 10.0
+offset_right = -8.0
+offset_bottom = 38.0
+text = "x1"
+horizontal_alignment = 2
+theme_override_font_sizes/font_size = 16
+
+[node name="ModeLabel" type="Label" parent="."]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -120.0
+offset_top = 54.0
+offset_right = 120.0
+offset_bottom = 80.0
+text = ""
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 14
+modulate = Color(1, 0.55, 0, 1)
+
+[node name="TiltBar" type="ProgressBar" parent="."]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -100.0
+offset_top = 82.0
+offset_right = 100.0
+offset_bottom = 96.0
+value = 0.0
+show_percentage = false
+
+[node name="JackpotLabel" type="Label" parent="."]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -140.0
+offset_top = 100.0
+offset_right = 140.0
+offset_bottom = 124.0
+text = "♦  JACKPOT  LIT  ♦"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 13
+modulate = Color(1, 0.84, 0, 1)
+visible = false
+
+[node name="CalloutLabel" type="Label" parent="."]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -160.0
+offset_top = 440.0
+offset_right = 160.0
+offset_bottom = 480.0
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 28
+modulate = Color(1, 0.84, 0, 1)
+visible = false
+
+[node name="CalloutTimer" type="Timer" parent="."]
+one_shot = true

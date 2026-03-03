@@ -1,0 +1,29 @@
+[gd_scene load_steps=4 format=3 uid="uid://slingshot_scene"]
+
+[ext_resource type="Script" path="res://scripts/slingshot.gd" id="1_sling"]
+
+[sub_resource type="SegmentShape2D" id="SegmentShape2D_body"]
+a = Vector2(-52, 0)
+b = Vector2(52, 0)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_detect"]
+size = Vector2(108, 18)
+
+[node name="Slingshot" type="Node2D"]
+script = ExtResource("1_sling")
+kick_normal = Vector2(1, -0.8)
+color = Color(0.9, 0.3, 1, 1)
+
+[node name="Body" type="StaticBody2D" parent="."]
+collision_layer = 16
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Body"]
+shape = SubResource("SegmentShape2D_body")
+
+[node name="DetectArea" type="Area2D" parent="."]
+collision_layer = 32
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="DetectArea"]
+shape = SubResource("RectangleShape2D_detect")

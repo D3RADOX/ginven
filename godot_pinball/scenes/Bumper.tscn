@@ -1,0 +1,29 @@
+[gd_scene load_steps=4 format=3 uid="uid://bumper_scene"]
+
+[ext_resource type="Script" path="res://scripts/bumper.gd" id="1_bumper"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 24.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_detect"]
+radius = 27.0
+
+[node name="Bumper" type="Node2D"]
+script = ExtResource("1_bumper")
+points = 500
+label_text = "★"
+color = Color(1, 0.84, 0, 1)
+
+[node name="Body" type="StaticBody2D" parent="."]
+collision_layer = 8
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Body"]
+shape = SubResource("CircleShape2D_body")
+
+[node name="DetectArea" type="Area2D" parent="."]
+collision_layer = 32
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="DetectArea"]
+shape = SubResource("CircleShape2D_detect")

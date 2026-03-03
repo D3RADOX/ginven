@@ -1,0 +1,137 @@
+[gd_scene load_steps=28 format=3 uid="uid://table_scene"]
+
+[ext_resource type="Script" path="res://scripts/table.gd"         id="1_table"]
+[ext_resource type="Script" path="res://scripts/plunger.gd"       id="2_plunger"]
+[ext_resource type="Script" path="res://scripts/spinner.gd"       id="3_spinner"]
+[ext_resource type="Script" path="res://scripts/scoop.gd"         id="4_scoop"]
+[ext_resource type="Script" path="res://scripts/drain.gd"         id="5_drain"]
+[ext_resource type="PackedScene" path="res://scenes/Flipper.tscn"       id="6_flipper"]
+[ext_resource type="PackedScene" path="res://scenes/Bumper.tscn"        id="7_bumper"]
+[ext_resource type="PackedScene" path="res://scenes/Slingshot.tscn"     id="8_sling"]
+[ext_resource type="PackedScene" path="res://scenes/StandupTarget.tscn" id="9_standup"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_spinner"]
+radius = 28.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_scoop"]
+radius = 22.0
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_drain"]
+size = Vector2(432, 24)
+
+[node name="Table" type="Node2D"]
+script = ExtResource("1_table")
+
+[node name="Walls" type="StaticBody2D" parent="."]
+collision_layer = 2
+collision_mask = 1
+
+[node name="Plunger" type="Node2D" parent="."]
+position = Vector2(548, 874)
+script = ExtResource("2_plunger")
+
+[node name="FlipperLeft" parent="." instance=ExtResource("6_flipper")]
+position = Vector2(144, 926)
+side = "left"
+
+[node name="FlipperRight" parent="." instance=ExtResource("6_flipper")]
+position = Vector2(432, 926)
+side = "right"
+
+[node name="Bumper1" parent="." instance=ExtResource("7_bumper")]
+position = Vector2(288, 180)
+points = 500
+label_text = "♠"
+color = Color(1, 0.84, 0, 1)
+
+[node name="Bumper2" parent="." instance=ExtResource("7_bumper")]
+position = Vector2(210, 260)
+points = 300
+label_text = "VIP"
+color = Color(1, 0.08, 0.58, 1)
+
+[node name="Bumper3" parent="." instance=ExtResource("7_bumper")]
+position = Vector2(366, 260)
+points = 300
+label_text = "BAR"
+color = Color(1, 0.08, 0.58, 1)
+
+[node name="Bumper4" parent="." instance=ExtResource("7_bumper")]
+position = Vector2(232, 340)
+points = 200
+label_text = "♦"
+color = Color(0.85, 0.44, 1, 1)
+
+[node name="Bumper5" parent="." instance=ExtResource("7_bumper")]
+position = Vector2(344, 340)
+points = 200
+label_text = "♦"
+color = Color(0.85, 0.44, 1, 1)
+
+[node name="SlingshotLeft" parent="." instance=ExtResource("8_sling")]
+position = Vector2(78, 790)
+rotation = -0.5236
+kick_normal = Vector2(1, -0.75)
+
+[node name="SlingshotRight" parent="." instance=ExtResource("8_sling")]
+position = Vector2(498, 790)
+rotation = 0.5236
+kick_normal = Vector2(-1, -0.75)
+
+[node name="StandupLeft1" parent="." instance=ExtResource("9_standup")]
+position = Vector2(84, 520)
+side = "left"
+index = 0
+
+[node name="StandupLeft2" parent="." instance=ExtResource("9_standup")]
+position = Vector2(84, 560)
+side = "left"
+index = 1
+
+[node name="StandupLeft3" parent="." instance=ExtResource("9_standup")]
+position = Vector2(84, 600)
+side = "left"
+index = 2
+
+[node name="StandupRight1" parent="." instance=ExtResource("9_standup")]
+position = Vector2(492, 520)
+side = "right"
+index = 0
+
+[node name="StandupRight2" parent="." instance=ExtResource("9_standup")]
+position = Vector2(492, 560)
+side = "right"
+index = 1
+
+[node name="StandupRight3" parent="." instance=ExtResource("9_standup")]
+position = Vector2(492, 600)
+side = "right"
+index = 2
+
+[node name="Spinner" type="Area2D" parent="."]
+position = Vector2(288, 460)
+collision_layer = 32
+collision_mask = 1
+script = ExtResource("3_spinner")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Spinner"]
+shape = SubResource("CircleShape2D_spinner")
+
+[node name="Scoop" type="Area2D" parent="."]
+position = Vector2(200, 380)
+collision_layer = 32
+collision_mask = 1
+script = ExtResource("4_scoop")
+eject_dir = Vector2(0.4, -1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Scoop"]
+shape = SubResource("CircleShape2D_scoop")
+
+[node name="Drain" type="Area2D" parent="."]
+position = Vector2(288, 986)
+collision_layer = 32
+collision_mask = 1
+script = ExtResource("5_drain")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Drain"]
+shape = SubResource("RectangleShape2D_drain")
