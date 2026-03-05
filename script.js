@@ -1,1155 +1,1053 @@
 'use strict';
 
-// ─────────────────────────── Canvas dimensions ───────────────────────────
-const CW = 360, CH = 580;
+// ════════════════════════════════════════════════════════════
+//  SUMO SOCCER  —  Intense mobile-first 2D canvas game
+// ════════════════════════════════════════════════════════════
 
-// ─────────────────────────── Physics constants ───────────────────────────
-const GRAVITY   = 0.28;
-const MAX_SPD   = 20;
-const FLIP_SPD  = 0.22;   // radians/frame – flipper rotation speed
-const FLEN      = 78;     // flipper length in pixels
-const FTHICK    = 7;      // flipper half-thickness for collision
+// ── Logical canvas size ──────────────────────────────────────
+const LW = 800, LH = 560;
 
-// ─────────────────────────── Game state ──────────────────────────────────
-let score       = 0;
-let ballsLeft   = 3;
-let gameRunning = false;
-let ballActive  = false;
-let combo       = 1;
-let comboTimer  = 0;
-let time        = 0;          // global frame counter for animations
+// ── Field geometry ───────────────────────────────────────────
+const FX = 52, FY = 48;          // field top-left
+const FW = 696, FH = 388;        // field width / height
+const FCX = FX + FW / 2;         // field centre X = 400
+const FCY = FY + FH / 2;         // field centre Y = 242
 
-// ─────────────────────────── Animation state ─────────────────────────────
-const ballTrail = [];         // last N ball positions for motion trail
-const sparkles  = [];         // drifting sparkle particles
+// ── Goal geometry ────────────────────────────────────────────
+const GH   = 148;                 // goal mouth height
+const GD   = 46;                  // goal depth (behind field wall)
+const GY   = FCY - GH / 2;       // goal top Y  (~168)
+const LGX1 = FX - GD;            // left-goal back wall X
+const RGX2 = FX + FW + GD;       // right-goal back wall X
 
-// ─────────────────────────── Ball ────────────────────────────────────────
-const ball = { x: CW / 2, y: 100, vx: 0, vy: 0, r: 9 };
+// ── Physics constants ────────────────────────────────────────
+const PR        = 28;             // player radius
+const PM        = 9;              // player mass
+const P_ACCEL   = 1.4;            // player acceleration per frame
+const P_MAXSP   = 6;              // player max speed
+const P_FRIC    = 0.80;           // player friction (per frame)
 
-// ─────────────────────────── Flippers ────────────────────────────────────
-// Left pivot at bottom-left, right pivot at bottom-right
-const LF = {
-  px: 88,  py: 548,
-  restA:   0.45,
-  activeA: -0.45,
-  angle:   0.45,
-  prevAngle: 0.45,
-  pressed: false
+const DASH_PWR  = 22;             // dash launch speed
+const DASH_DUR  = 200;            // ms dash lasts
+const DASH_COOL = 1500;           // ms dash cooldown
+
+const BR        = 14;             // ball radius
+const BM        = 1;              // ball mass
+const B_FRIC    = 0.987;          // ball rolling friction
+const B_BOUNCE  = 0.60;           // ball wall restitution
+
+// ── Match settings ───────────────────────────────────────────
+const GOALS_WIN  = 5;
+const GOAL_PAUSE = 2800;          // ms freeze after goal
+
+// ── Colours ──────────────────────────────────────────────────
+const C = {
+  bg:       '#080812',
+  field:    '#1b5e1b',
+  fieldAlt: '#1e661e',
+  lines:    'rgba(255,255,255,0.55)',
+  net:      'rgba(255,255,255,0.12)',
+  p1:       '#ff2244',
+  p1dk:     '#99001a',
+  p1belt:   '#ffd700',
+  p2:       '#2255ff',
+  p2dk:     '#001199',
+  p2belt:   '#00e5ff',
+  ball:     '#f0ede0',
+  ballDk:   '#bbb89a',
+  ctrlBg:   '#0e0e1a',
+  ctrlLine: '#22224a',
+  hud:      '#0c0c1c',
+  hudLine:  '#242448',
+  text:     '#ffffff',
+  gold:     '#ffd700',
 };
-const RF = {
-  px: 272, py: 548,
-  restA:   Math.PI - 0.45,
-  activeA: Math.PI + 0.45,
-  angle:   Math.PI - 0.45,
-  prevAngle: Math.PI - 0.45,
-  pressed: false
+
+// ── Control layout ───────────────────────────────────────────
+const CTRL_Y  = FY + FH + 2;     // top of control strip = 438
+const JCX     = 130;
+const JCY     = CTRL_Y + 61;
+const JR_BASE = 54;
+const JR_KNOB = 22;
+const DBX     = LW - 120;
+const DBY     = JCY;
+const DB_R    = 46;
+
+// ════════════════════════════════════════════════════════════
+//  CANVAS SETUP
+// ════════════════════════════════════════════════════════════
+const canvas = document.getElementById('gameCanvas');
+const ctx    = canvas.getContext('2d');
+canvas.width  = LW;
+canvas.height = LH;
+
+function resize() {
+  const sw = window.innerWidth, sh = window.innerHeight;
+  const scale = Math.min(sw / LW, sh / LH);
+  const cw = LW * scale, ch = LH * scale;
+  canvas.style.width   = cw + 'px';
+  canvas.style.height  = ch + 'px';
+  canvas.style.left    = ((sw - cw) / 2) + 'px';
+  canvas.style.top     = ((sh - ch) / 2) + 'px';
+}
+resize();
+window.addEventListener('resize', resize);
+
+function screenToLogical(cx, cy) {
+  const r = canvas.getBoundingClientRect();
+  return {
+    x: (cx - r.left) * (LW / r.width),
+    y: (cy - r.top)  * (LH / r.height),
+  };
+}
+
+// ════════════════════════════════════════════════════════════
+//  GAME STATE
+// ════════════════════════════════════════════════════════════
+let mode       = 'menu';   // menu | playing | goal | gameover
+let score      = [0, 0];
+let scoredTeam = -1;
+let goalTimer  = 0;
+let winner     = -1;
+let matchAnim  = 0;
+
+// Screen shake
+let shakeX = 0, shakeY = 0, shakeTtl = 0;
+
+// ════════════════════════════════════════════════════════════
+//  INPUT
+// ════════════════════════════════════════════════════════════
+const keys = {};
+window.addEventListener('keydown', e => { keys[e.code] = true; e.preventDefault(); }, { passive: false });
+window.addEventListener('keyup',   e => { keys[e.code] = false; });
+
+const joy = {
+  active: false, tid: -1,
+  bx: JCX, by: JCY,
+  kx: JCX, ky: JCY,
+  dx: 0, dy: 0,
 };
+const dashTouch = { active: false, tid: -1 };
 
-// ─────────────────────────── Bumpers ─────────────────────────────────────
-const BUMPERS = [
-  { x: 180, y: 138, r: 26, pts: 200, label: '♦',     color: '#ffd700', glow: 0 },
-  { x: 116, y: 200, r: 22, pts: 100, label: 'VIP',   color: '#ff1493', glow: 0 },
-  { x: 244, y: 200, r: 22, pts: 100, label: 'BAR',   color: '#ff1493', glow: 0 },
-  { x: 180, y: 256, r: 22, pts: 150, label: 'STAGE', color: '#da70d6', glow: 0 },
-  { x: 106, y: 298, r: 18, pts:  75, label: '♦',     color: '#ffd700', glow: 0 },
-  { x: 254, y: 298, r: 18, pts:  75, label: '♦',     color: '#ffd700', glow: 0 },
-];
+canvas.addEventListener('touchstart',  onTouchStart, { passive: false });
+canvas.addEventListener('touchmove',   onTouchMove,  { passive: false });
+canvas.addEventListener('touchend',    onTouchEnd,   { passive: false });
+canvas.addEventListener('touchcancel', onTouchEnd,   { passive: false });
+canvas.addEventListener('click', onClick);
 
-// ─────────────────────────── Rollover lanes ──────────────────────────────
-const LANES = [
-  { x:  62, y: 64, r: 13, lit: false, pts: 100, label: 'A' },
-  { x: 130, y: 47, r: 13, lit: false, pts: 100, label: 'L' },
-  { x: 200, y: 42, r: 13, lit: false, pts: 100, label: '♦' },
-  { x: 265, y: 47, r: 13, lit: false, pts: 100, label: 'S' },
-  { x: 298, y: 64, r: 13, lit: false, pts: 100, label: '♦' },
-];
-
-// ─────────────────────────── Gutter guide walls ──────────────────────────
-// Angled lines that funnel the ball toward the flippers
-const GUTTERS = [
-  { x1: 10,        y1: 468, x2: LF.px, y2: LF.py },
-  { x1: CW - 10,   y1: 468, x2: RF.px, y2: RF.py },
-];
-
-// ─────────────────────────── Score popups ────────────────────────────────
-const popups = []; // { x, y, text, life, maxLife }
-
-// ─────────────────────────── DOM refs ────────────────────────────────────
-let canvas, ctx;
-
-// ═════════════════════════════════════════════════════════════════════════
-//  INIT
-// ═════════════════════════════════════════════════════════════════════════
-window.addEventListener('DOMContentLoaded', () => {
-  canvas = document.getElementById('c');
-  ctx    = canvas.getContext('2d');
-
-  // Overlay restart button
-  document.getElementById('ov-btn').addEventListener('click', startGame);
-
-  // ── Keyboard controls ──────────────────────────────────────────────────
-  window.addEventListener('keydown', e => {
-    if (['z', 'Z', 'ArrowLeft'].includes(e.key))  { e.preventDefault(); LF.pressed = true; }
-    if (['/', 'ArrowRight'].includes(e.key))       { e.preventDefault(); RF.pressed = true; }
-  });
-  window.addEventListener('keyup', e => {
-    if (['z', 'Z', 'ArrowLeft'].includes(e.key))  LF.pressed = false;
-    if (['/', 'ArrowRight'].includes(e.key))       RF.pressed = false;
-  });
-
-  // ── Canvas touch (tap left half / right half) ──────────────────────────
-  canvas.addEventListener('touchstart', onCanvasTouch, { passive: false });
-  canvas.addEventListener('touchmove',  onCanvasTouch, { passive: false });
-  canvas.addEventListener('touchend',   onCanvasTouchEnd, { passive: false });
-
-  // ── On-screen buttons ──────────────────────────────────────────────────
-  bindBtn('btn-left',  LF);
-  bindBtn('btn-right', RF);
-
-  startGame();
-  requestAnimationFrame(loop);
-});
-
-function bindBtn(id, flipper) {
-  const btn = document.getElementById(id);
-  const activate   = e => { e.preventDefault(); flipper.pressed = true;  btn.classList.add('pressed'); };
-  const deactivate = e => { e.preventDefault(); flipper.pressed = false; btn.classList.remove('pressed'); };
-  btn.addEventListener('mousedown',    activate);
-  btn.addEventListener('touchstart',   activate,   { passive: false });
-  btn.addEventListener('mouseup',      deactivate);
-  btn.addEventListener('mouseleave',   deactivate);
-  btn.addEventListener('touchend',     deactivate, { passive: false });
-  btn.addEventListener('touchcancel',  deactivate, { passive: false });
-}
-
-function onCanvasTouch(e) {
+function onTouchStart(e) {
   e.preventDefault();
-  const rect   = canvas.getBoundingClientRect();
-  const scaleX = CW / rect.width;
-  let left = false, right = false;
-  for (const t of e.touches) {
-    if ((t.clientX - rect.left) * scaleX < CW / 2) left  = true;
-    else                                             right = true;
-  }
-  LF.pressed = left;
-  RF.pressed = right;
-}
-
-function onCanvasTouchEnd(e) {
-  e.preventDefault();
-  if (e.touches.length === 0) { LF.pressed = false; RF.pressed = false; }
-  else onCanvasTouch(e);
-}
-
-// ═════════════════════════════════════════════════════════════════════════
-//  GAME FLOW
-// ═════════════════════════════════════════════════════════════════════════
-function startGame() {
-  score      = 0;
-  ballsLeft  = 3;
-  combo      = 1;
-  comboTimer = 0;
-  popups.length = 0;
-  LANES.forEach(l => l.lit = false);
-  BUMPERS.forEach(b => b.glow = 0);
-  LF.pressed = false;
-  RF.pressed = false;
-  updateHUD();
-  document.getElementById('overlay').classList.add('hidden');
-  gameRunning = true;
-  launchBall();
-}
-
-function launchBall() {
-  ball.x  = CW / 2 + (Math.random() * 50 - 25);
-  ball.y  = 90;
-  ball.vx = (Math.random() > 0.5 ? 1.8 : -1.8);
-  ball.vy = 3.5;
-  LF.angle = LF.restA; LF.prevAngle = LF.restA;
-  RF.angle = RF.restA; RF.prevAngle = RF.restA;
-  ballActive = true;
-}
-
-function drainBall() {
-  if (!ballActive) return;
-  ballActive = false;
-  ballTrail.length = 0;
-  ballsLeft--;
-  updateHUD();
-  if (ballsLeft <= 0) {
-    setTimeout(endGame, 400);
-  } else {
-    setTimeout(launchBall, 1000);
-  }
-}
-
-function endGame() {
-  gameRunning = false;
-  document.getElementById('ov-title').textContent = 'GAME OVER';
-  document.getElementById('ov-score').innerHTML =
-    `FINAL SCORE<br><span style="color:#ffd700;font-size:22px">${score.toLocaleString()}</span>`;
-  document.getElementById('overlay').classList.remove('hidden');
-}
-
-function updateHUD() {
-  const el = document.getElementById('score-el');
-  el.textContent = score.toLocaleString();
-  // Flash the score element on each update
-  el.classList.remove('pop');
-  void el.offsetWidth;   // force reflow to restart animation
-  el.classList.add('pop');
-  document.getElementById('balls-el').textContent = ballsLeft;
-}
-
-// ═════════════════════════════════════════════════════════════════════════
-//  MAIN LOOP
-// ═════════════════════════════════════════════════════════════════════════
-function loop() {
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
-
-// ═════════════════════════════════════════════════════════════════════════
-//  UPDATE
-// ═════════════════════════════════════════════════════════════════════════
-function update() {
-  time++;
-
-  // Combo timer decay
-  if (comboTimer > 0 && --comboTimer === 0) combo = 1;
-
-  // Sparkles animate every frame regardless of ball state
-  updateSparkles();
-
-  // Animate flippers even when ball is not active (visual feedback)
-  moveFlipper(LF);
-  moveFlipper(RF);
-
-  if (!gameRunning || !ballActive) return;
-
-  // ── Gravity + velocity cap ─────────────────────────────────────────────
-  ball.vy += GRAVITY;
-  const spd = Math.hypot(ball.vx, ball.vy);
-  if (spd > MAX_SPD) {
-    ball.vx = (ball.vx / spd) * MAX_SPD;
-    ball.vy = (ball.vy / spd) * MAX_SPD;
-  }
-  ball.x += ball.vx;
-  ball.y += ball.vy;
-
-  // ── Ball trail ─────────────────────────────────────────────────────────
-  ballTrail.push({ x: ball.x, y: ball.y });
-  if (ballTrail.length > 15) ballTrail.shift();
-
-  // ── Side & top walls ───────────────────────────────────────────────────
-  if (ball.x - ball.r < 10)       { ball.x = 10 + ball.r;        ball.vx =  Math.abs(ball.vx) * 0.82; }
-  if (ball.x + ball.r > CW - 10)  { ball.x = CW - 10 - ball.r;  ball.vx = -Math.abs(ball.vx) * 0.82; }
-  if (ball.y - ball.r < 28)       { ball.y = 28 + ball.r;        ball.vy =  Math.abs(ball.vy) * 0.75; }
-
-  // ── Gutter walls ──────────────────────────────────────────────────────
-  GUTTERS.forEach(g => checkSegCollision(g.x1, g.y1, g.x2, g.y2));
-
-  // ── Bumper collisions ─────────────────────────────────────────────────
-  for (const b of BUMPERS) {
-    const dx   = ball.x - b.x;
-    const dy   = ball.y - b.y;
-    const dist = Math.hypot(dx, dy);
-    const minD = ball.r + b.r;
-
-    if (dist < minD && dist > 0) {
-      const nx = dx / dist, ny = dy / dist;
-      // Push ball out
-      ball.x = b.x + nx * minD;
-      ball.y = b.y + ny * minD;
-      // Reflect + slight speed boost
-      const dot = ball.vx * nx + ball.vy * ny;
-      ball.vx = (ball.vx - 2 * dot * nx) * 1.12;
-      ball.vy = (ball.vy - 2 * dot * ny) * 1.12;
-      // Minimum outward speed
-      const ns = Math.hypot(ball.vx, ball.vy);
-      if (ns < 7) { ball.vx = nx * 7; ball.vy = ny * 7; }
-      // Score & visual
-      const pts = b.pts * combo;
-      addScore(pts, b.x, b.y - b.r - 10);
-      b.glow    = 14;
-      combo     = Math.min(combo + 1, 10);
-      comboTimer = 90;
-    }
-    if (b.glow > 0) b.glow--;
-  }
-
-  // ── Rollover lanes ────────────────────────────────────────────────────
-  for (const l of LANES) {
-    if (!l.lit && Math.hypot(ball.x - l.x, ball.y - l.y) < ball.r + l.r) {
-      l.lit = true;
-      addScore(l.pts * combo, l.x, l.y - l.r - 8);
-      if (LANES.every(ln => ln.lit)) {
-        addScore(2000, CW / 2, 35);
-        setTimeout(() => LANES.forEach(ln => ln.lit = false), 2200);
+  for (const t of e.changedTouches) {
+    const { x, y } = screenToLogical(t.clientX, t.clientY);
+    if (mode === 'menu' || mode === 'gameover') { startGame(); return; }
+    if (y > CTRL_Y) {
+      if (x < LW / 2) {
+        joy.active = true;  joy.tid = t.identifier;
+        joy.bx = x; joy.by = y;
+        joy.kx = x; joy.ky = y;
+        joy.dx = 0; joy.dy = 0;
+      } else {
+        dashTouch.active = true; dashTouch.tid = t.identifier;
+        triggerDash(p1);
       }
     }
   }
+}
 
-  // ── Flipper collisions ────────────────────────────────────────────────
-  checkFlipperCollision(LF);
-  checkFlipperCollision(RF);
-
-  // ── Drain ─────────────────────────────────────────────────────────────
-  if (ball.y > CH + 20) drainBall();
-
-  // ── Popup decay ───────────────────────────────────────────────────────
-  for (let i = popups.length - 1; i >= 0; i--) {
-    popups[i].y -= 1.3;
-    if (--popups[i].life <= 0) popups.splice(i, 1);
+function onTouchMove(e) {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier !== joy.tid) continue;
+    const { x, y } = screenToLogical(t.clientX, t.clientY);
+    const dx = x - joy.bx, dy = y - joy.by;
+    const d  = Math.hypot(dx, dy);
+    if (d > 0) {
+      const mx = JR_BASE - JR_KNOB;
+      const c  = Math.min(d, mx);
+      joy.kx = joy.bx + (dx / d) * c;
+      joy.ky = joy.by + (dy / d) * c;
+      joy.dx = dx / d;
+      joy.dy = dy / d;
+    }
   }
 }
 
-// ─────────────────────────── Flipper helpers ─────────────────────────────
-function moveFlipper(f) {
-  f.prevAngle = f.angle;
-  const target = f.pressed ? f.activeA : f.restA;
-  const diff   = target - f.angle;
-  if (Math.abs(diff) < 0.005) { f.angle = target; return; }
-  f.angle += Math.sign(diff) * Math.min(Math.abs(diff), FLIP_SPD);
+function onTouchEnd(e) {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier === joy.tid) {
+      joy.active = false; joy.tid = -1;
+      joy.kx = joy.bx; joy.ky = joy.by;
+      joy.dx = 0; joy.dy = 0;
+    }
+    if (t.identifier === dashTouch.tid) {
+      dashTouch.active = false; dashTouch.tid = -1;
+    }
+  }
 }
 
-function checkFlipperCollision(f) {
-  const tx   = f.px + FLEN * Math.cos(f.angle);
-  const ty   = f.py + FLEN * Math.sin(f.angle);
-  const cp   = closestPtOnSeg(f.px, f.py, tx, ty, ball.x, ball.y);
-  const dx   = ball.x - cp.x;
-  const dy   = ball.y - cp.y;
+function onClick() {
+  if (mode === 'menu' || mode === 'gameover') startGame();
+}
+
+// ════════════════════════════════════════════════════════════
+//  AUDIO  (Web Audio API, procedural)
+// ════════════════════════════════════════════════════════════
+let AC = null;
+function getAC() {
+  if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+  return AC;
+}
+
+function playKick(vol) {
+  try {
+    const ac  = getAC();
+    const len = Math.floor(ac.sampleRate * 0.08);
+    const buf = ac.createBuffer(1, len, ac.sampleRate);
+    const d   = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4) * vol;
+    }
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    const g = ac.createGain(); g.gain.value = 0.5;
+    src.connect(g); g.connect(ac.destination);
+    src.start();
+  } catch (_) {}
+}
+
+function playGoalSfx() {
+  try {
+    const ac = getAC();
+    [440, 554, 659, 880, 1108].forEach((f, i) => {
+      const o = ac.createOscillator();
+      const g = ac.createGain();
+      o.type = 'square';
+      o.frequency.value = f;
+      const t0 = ac.currentTime + i * 0.1;
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(0.22, t0 + 0.03);
+      g.gain.linearRampToValueAtTime(0, t0 + 0.35);
+      o.connect(g); g.connect(ac.destination);
+      o.start(t0); o.stop(t0 + 0.38);
+    });
+  } catch (_) {}
+}
+
+function playDashSfx() {
+  try {
+    const ac = getAC();
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(300, ac.currentTime);
+    o.frequency.exponentialRampToValueAtTime(60, ac.currentTime + 0.18);
+    g.gain.setValueAtTime(0.18, ac.currentTime);
+    g.gain.linearRampToValueAtTime(0, ac.currentTime + 0.18);
+    o.connect(g); g.connect(ac.destination);
+    o.start(); o.stop(ac.currentTime + 0.18);
+  } catch (_) {}
+}
+
+function playBump(vol) {
+  try {
+    const ac = getAC();
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(120, ac.currentTime);
+    o.frequency.exponentialRampToValueAtTime(40, ac.currentTime + 0.12);
+    g.gain.setValueAtTime(vol * 0.35, ac.currentTime);
+    g.gain.linearRampToValueAtTime(0, ac.currentTime + 0.12);
+    o.connect(g); g.connect(ac.destination);
+    o.start(); o.stop(ac.currentTime + 0.14);
+  } catch (_) {}
+}
+
+// ════════════════════════════════════════════════════════════
+//  PARTICLES
+// ════════════════════════════════════════════════════════════
+const particles = [];
+
+function spawnGoalBurst(x, y, color) {
+  for (let i = 0; i < 70; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const sp    = 2 + Math.random() * 9;
+    particles.push({
+      x, y, vx: Math.cos(angle) * sp, vy: Math.sin(angle) * sp - 1.5,
+      life: 1.0, decay: 0.011 + Math.random() * 0.016,
+      r: 3 + Math.random() * 6, color, gravity: 0.12,
+    });
+  }
+}
+
+function spawnHitSparks(x, y, nx, ny, intensity) {
+  const n = 4 + Math.floor(intensity * 12);
+  for (let i = 0; i < n; i++) {
+    const a  = Math.atan2(ny, nx) + (Math.random() - 0.5) * 1.8;
+    const sp = 0.5 + Math.random() * intensity * 4;
+    particles.push({
+      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      life: 0.7, decay: 0.04 + Math.random() * 0.05,
+      r: 1.5 + Math.random() * 2.5, color: '#ffcc44', gravity: 0.05,
+    });
+  }
+}
+
+function spawnDashTrail(x, y, color) {
+  particles.push({
+    x: x + (Math.random() - 0.5) * 12,
+    y: y + (Math.random() - 0.5) * 12,
+    vx: (Math.random() - 0.5) * 0.8, vy: (Math.random() - 0.5) * 0.8,
+    life: 0.55, decay: 0.06, r: 7 + Math.random() * 9,
+    color, gravity: 0, alpha: 0.42,
+  });
+}
+
+function spawnConfetti(x, y) {
+  const cols = ['#ff2244','#2255ff','#ffd700','#00e5ff','#ff69b4','#44ff88'];
+  for (let i = 0; i < 55; i++) {
+    const a  = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.4;
+    const sp = 3 + Math.random() * 7;
+    const side = Math.random() < 0.5 ? -1 : 1;
+    particles.push({
+      x: x + (Math.random() - 0.5) * 80, y,
+      vx: Math.cos(a) * sp * side, vy: Math.sin(a) * sp - 2,
+      life: 1.0, decay: 0.007 + Math.random() * 0.01,
+      r: 4 + Math.random() * 4,
+      color: cols[Math.floor(Math.random() * cols.length)],
+      gravity: 0.1, isConfetti: true,
+      rot: Math.random() * Math.PI * 2, rotV: (Math.random() - 0.5) * 0.22,
+    });
+  }
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x   += p.vx * dt; p.y += p.vy * dt;
+    p.vx  *= 0.97;      p.vy *= 0.97;
+    p.vy  += (p.gravity || 0) * dt;
+    p.life -= p.decay * dt;
+    if (p.rot !== undefined) p.rot += p.rotV;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, p.life) * (p.alpha || 1);
+    ctx.fillStyle   = p.color;
+    if (p.isConfetti) {
+      ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.fillRect(-p.r, -p.r * 0.45, p.r * 2, p.r);
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  GAME ENTITIES
+// ════════════════════════════════════════════════════════════
+let p1, p2, ball;
+
+function makePlayer(x, y, team) {
+  return {
+    x, y, vx: 0, vy: 0,
+    r: PR, mass: PM, team,
+    angle: team === 0 ? 0 : Math.PI,
+    dashTimer: 0, dashCooldown: 0, stun: 0,
+    aiTarget: { x, y }, aiDashWait: 600 + Math.random() * 800,
+  };
+}
+
+function makeBall() {
+  return { x: FCX, y: FCY, vx: 0, vy: 0, r: BR, mass: BM, spin: 0, spinV: 0 };
+}
+
+// ════════════════════════════════════════════════════════════
+//  PHYSICS
+// ════════════════════════════════════════════════════════════
+function circleCollide(a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
   const dist = Math.hypot(dx, dy);
-  const minD = ball.r + FTHICK;
+  const minD = a.r + b.r;
+  if (dist >= minD || dist < 0.001) return false;
 
-  if (dist < minD && dist > 0) {
-    const nx = dx / dist, ny = dy / dist;
-    ball.x = cp.x + nx * minD;
-    ball.y = cp.y + ny * minD;
+  const nx = dx / dist, ny = dy / dist;
+  const overlap = minD - dist, tm = a.mass + b.mass;
 
-    const dot = ball.vx * nx + ball.vy * ny;
-    if (dot < 0) {
-      ball.vx -= 2 * dot * nx;
-      ball.vy -= 2 * dot * ny;
+  a.x -= nx * overlap * (b.mass / tm);
+  a.y -= ny * overlap * (b.mass / tm);
+  b.x += nx * overlap * (a.mass / tm);
+  b.y += ny * overlap * (a.mass / tm);
 
-      // Add angular velocity contribution from moving flipper
-      const flipVel = f.angle - f.prevAngle;
-      if (Math.abs(flipVel) > 0.005) {
-        // Compute contact point's distance from pivot
-        const t = Math.max(0, Math.min(1,
-          ((cp.x - f.px) * Math.cos(f.angle) + (cp.y - f.py) * Math.sin(f.angle)) / FLEN
-        ));
-        const d = t * FLEN;
-        ball.vx += -Math.sin(f.angle) * d * flipVel * 0.40;
-        ball.vy +=  Math.cos(f.angle) * d * flipVel * 0.40;
-      }
-      // Guarantee minimum upward launch when flipper is active
-      if (f.pressed && ball.vy > -6) ball.vy = -8.5 - Math.random() * 2;
-    }
+  const rvx = b.vx - a.vx, rvy = b.vy - a.vy;
+  const rvn = rvx * nx + rvy * ny;
+  if (rvn >= 0) return true;
+
+  const e  = 0.68;
+  const jA = a.dashTimer > 0 ? 2.8 : 1.0;
+  const jB = b.dashTimer > 0 ? 2.8 : 1.0;
+  const imp = -(1 + e) * rvn / (1 / a.mass + 1 / b.mass);
+
+  a.vx -= imp * nx / a.mass * jA;
+  a.vy -= imp * ny / a.mass * jA;
+  b.vx += imp * nx / b.mass * jB;
+  b.vy += imp * ny / b.mass * jB;
+  return true;
+}
+
+function boundBall(b) {
+  const inGoalY     = b.y > GY && b.y < GY + GH;
+  const inLeftGoal  = b.x < FX;
+  const inRightGoal = b.x > FX + FW;
+
+  // Top / bottom field walls
+  if (b.y < FY + b.r)       { b.y = FY + b.r;       b.vy =  Math.abs(b.vy) * B_BOUNCE; b.spinV *= -0.5; }
+  if (b.y > FY + FH - b.r)  { b.y = FY + FH - b.r;  b.vy = -Math.abs(b.vy) * B_BOUNCE; b.spinV *= -0.5; }
+
+  if (!inLeftGoal && !inRightGoal) {
+    // Normal field – left/right walls, open at goal mouth
+    if (b.x < FX + b.r && !inGoalY) { b.x = FX + b.r;      b.vx =  Math.abs(b.vx) * B_BOUNCE; b.spinV *= -0.4; }
+    if (b.x > FX + FW - b.r && !inGoalY) { b.x = FX + FW - b.r; b.vx = -Math.abs(b.vx) * B_BOUNCE; b.spinV *= -0.4; }
+  } else if (inLeftGoal) {
+    if (b.x < LGX1 + b.r)   { b.x = LGX1 + b.r;    b.vx =  Math.abs(b.vx) * B_BOUNCE; }
+    if (b.y < GY + b.r)     { b.y = GY + b.r;       b.vy =  Math.abs(b.vy) * B_BOUNCE; }
+    if (b.y > GY + GH - b.r){ b.y = GY + GH - b.r;  b.vy = -Math.abs(b.vy) * B_BOUNCE; }
+  } else if (inRightGoal) {
+    if (b.x > RGX2 - b.r)   { b.x = RGX2 - b.r;    b.vx = -Math.abs(b.vx) * B_BOUNCE; }
+    if (b.y < GY + b.r)     { b.y = GY + b.r;       b.vy =  Math.abs(b.vy) * B_BOUNCE; }
+    if (b.y > GY + GH - b.r){ b.y = GY + GH - b.r;  b.vy = -Math.abs(b.vy) * B_BOUNCE; }
   }
 }
 
-// ─────────────────────────── Segment collision ───────────────────────────
-function checkSegCollision(x1, y1, x2, y2) {
-  const cp   = closestPtOnSeg(x1, y1, x2, y2, ball.x, ball.y);
-  const dx   = ball.x - cp.x;
-  const dy   = ball.y - cp.y;
-  const dist = Math.hypot(dx, dy);
-  if (dist < ball.r + 3 && dist > 0) {
-    const nx = dx / dist, ny = dy / dist;
-    ball.x = cp.x + nx * (ball.r + 3);
-    ball.y = cp.y + ny * (ball.r + 3);
-    const dot = ball.vx * nx + ball.vy * ny;
-    if (dot < 0) { ball.vx -= 2 * dot * nx * 0.82; ball.vy -= 2 * dot * ny * 0.82; }
-  }
+function boundPlayer(p) {
+  if (p.x < FX + p.r)       { p.x = FX + p.r;       p.vx =  Math.abs(p.vx) * 0.3; }
+  if (p.x > FX + FW - p.r)  { p.x = FX + FW - p.r;  p.vx = -Math.abs(p.vx) * 0.3; }
+  if (p.y < FY + p.r)       { p.y = FY + p.r;        p.vy =  Math.abs(p.vy) * 0.3; }
+  if (p.y > FY + FH - p.r)  { p.y = FY + FH - p.r;  p.vy = -Math.abs(p.vy) * 0.3; }
 }
 
-function closestPtOnSeg(ax, ay, bx, by, px, py) {
-  const dx = bx - ax, dy = by - ay;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq === 0) return { x: ax, y: ay };
-  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
-  return { x: ax + t * dx, y: ay + t * dy };
+function checkGoal() {
+  const inGY = ball.y > GY && ball.y < GY + GH;
+  if (!inGY) return -1;
+  if (ball.x < FX - 6)       return 1;  // ball in left goal → p2 scored
+  if (ball.x > FX + FW + 6)  return 0;  // ball in right goal → p1 scored
+  return -1;
 }
 
-// ─────────────────────────── Score ───────────────────────────────────────
-function addScore(pts, x, y) {
-  score += pts;
-  updateHUD();
-  popups.push({ x, y, text: '+' + pts.toLocaleString(), life: 52, maxLife: 52 });
+// ════════════════════════════════════════════════════════════
+//  DASH
+// ════════════════════════════════════════════════════════════
+function triggerDash(player) {
+  if (!player || player.dashCooldown > 0) return;
+  const sp  = Math.hypot(player.vx, player.vy);
+  const ddx = sp > 0.1 ? player.vx / sp : Math.cos(player.angle);
+  const ddy = sp > 0.1 ? player.vy / sp : Math.sin(player.angle);
+  player.vx = ddx * DASH_PWR;
+  player.vy = ddy * DASH_PWR;
+  player.dashTimer    = DASH_DUR;
+  player.dashCooldown = DASH_COOL;
+  playDashSfx();
+  if (navigator.vibrate) navigator.vibrate(25);
 }
 
-// ═════════════════════════════════════════════════════════════════════════
-//  SPARKLE SYSTEM
-// ═════════════════════════════════════════════════════════════════════════
-const SPARK_PAL = [
-  '#ffd700','#ff1493','#ff69b4','#da70d6',
-  '#ffffff','#cc44ff','#ff8800','#00ddff','#ff44aa',
-];
+// ════════════════════════════════════════════════════════════
+//  PLAYER CONTROL (p1)
+// ════════════════════════════════════════════════════════════
+let _dashKeyWas = false;
 
-function spawnSparkle() {
-  sparkles.push({
-    x:       22 + Math.random() * (CW - 44),
-    y:       55 + Math.random() * (CH - 170),
-    vx:      (Math.random() - 0.5) * 0.55,
-    vy:      -0.22 - Math.random() * 0.55,
-    r:       0.8 + Math.random() * 2.4,
-    color:   SPARK_PAL[Math.floor(Math.random() * SPARK_PAL.length)],
-    life:    0,
-    maxLife: 85 + Math.floor(Math.random() * 90),
-    phase:   Math.random() * Math.PI * 2,
-    star:    Math.random() < 0.45,
-  });
-}
+function applyPlayerInput() {
+  if (!p1 || p1.stun > 0) return;
 
-function updateSparkles() {
-  if (sparkles.length < 50 && Math.random() < 0.55) spawnSparkle();
-  for (let i = sparkles.length - 1; i >= 0; i--) {
-    const s = sparkles[i];
-    s.x += s.vx;
-    s.y += s.vy;
-    s.life++;
-    if (s.life >= s.maxLife) sparkles.splice(i, 1);
-  }
-}
+  let ix = 0, iy = 0;
+  if (keys['KeyA'] || keys['ArrowLeft'])  ix -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) ix += 1;
+  if (keys['KeyW'] || keys['ArrowUp'])    iy -= 1;
+  if (keys['KeyS'] || keys['ArrowDown'])  iy += 1;
+  if (joy.active) { ix = joy.dx; iy = joy.dy; }
 
-function drawSparkles() {
-  ctx.save();
-  for (const s of sparkles) {
-    const fadeIn  = Math.min(1, s.life / 12);
-    const fadeOut = Math.max(0, 1 - (s.life - s.maxLife * 0.62) / (s.maxLife * 0.38));
-    const twinkle = 0.42 + 0.58 * Math.sin(time * 0.20 + s.phase);
-    const alpha   = fadeIn * fadeOut * twinkle;
-    if (alpha < 0.02) continue;
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle   = s.color;
-    ctx.shadowColor = s.color;
-    ctx.shadowBlur  = 7;
-    ctx.beginPath();
-    if (s.star) {
-      drawStar4(s.x, s.y, s.r * 1.5);
-    } else {
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-    }
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-  ctx.shadowBlur  = 0;
-  ctx.restore();
-}
-
-function drawStar4(x, y, r) {
-  const s = r * 0.38;
-  ctx.moveTo(x,     y - r);
-  ctx.lineTo(x + s, y - s);
-  ctx.lineTo(x + r, y    );
-  ctx.lineTo(x + s, y + s);
-  ctx.lineTo(x,     y + r);
-  ctx.lineTo(x - s, y + s);
-  ctx.lineTo(x - r, y    );
-  ctx.lineTo(x - s, y - s);
-  ctx.closePath();
-}
-
-// ═════════════════════════════════════════════════════════════════════════
-//  COLOR HELPERS
-// ═════════════════════════════════════════════════════════════════════════
-
-// rgba string from a #rrggbb hex + alpha 0..1
-function hexAlpha(hex, alpha) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
-}
-
-// Brighten a #rrggbb color by adding (amount * 255) to each channel
-function lighten(hex, amount) {
-  const d = Math.round(255 * amount);
-  const r = Math.min(255, parseInt(hex.slice(1, 3), 16) + d);
-  const g = Math.min(255, parseInt(hex.slice(3, 5), 16) + d);
-  const b = Math.min(255, parseInt(hex.slice(5, 7), 16) + d);
-  return `rgb(${r},${g},${b})`;
-}
-
-// Darken a #rrggbb color by subtracting (amount * 255) from each channel
-function darken(hex, amount) {
-  const d = Math.round(255 * amount);
-  const r = Math.max(0, parseInt(hex.slice(1, 3), 16) - d);
-  const g = Math.max(0, parseInt(hex.slice(3, 5), 16) - d);
-  const b = Math.max(0, parseInt(hex.slice(5, 7), 16) - d);
-  return `rgb(${r},${g},${b})`;
-}
-
-// ═════════════════════════════════════════════════════════════════════════
-//  PLAYFIELD TEXTURE  (rendered once to an offscreen canvas)
-// ═════════════════════════════════════════════════════════════════════════
-let _fieldCanvas = null;
-
-function getFieldCanvas() {
-  if (_fieldCanvas) return _fieldCanvas;
-
-  _fieldCanvas      = document.createElement('canvas');
-  _fieldCanvas.width  = CW;
-  _fieldCanvas.height = CH;
-  const c = _fieldCanvas.getContext('2d');
-
-  // ── Base gradient ────────────────────────────────────────────────────
-  const bg = c.createLinearGradient(0, 0, 0, CH);
-  bg.addColorStop(0,    '#1e0034');
-  bg.addColorStop(0.4,  '#110022');
-  bg.addColorStop(1,    '#07000f');
-  c.fillStyle = bg;
-  c.fillRect(0, 0, CW, CH);
-
-  // ── Diagonal diamond lattice (very subtle felt-weave) ────────────────
-  c.save();
-  c.globalAlpha = 0.038;
-  c.strokeStyle = '#b060ff';
-  c.lineWidth   = 0.7;
-  const step = 20;
-  for (let i = -CH; i < CW + CH; i += step) {
-    c.beginPath(); c.moveTo(i, 0); c.lineTo(i + CH, CH); c.stroke();
-    c.beginPath(); c.moveTo(i, 0); c.lineTo(i - CH, CH); c.stroke();
-  }
-  c.restore();
-
-  // ── Overhead spotlight (centre-top, simulates physical table light) ──
-  const spot = c.createRadialGradient(CW * 0.5, CH * 0.25, 10, CW * 0.5, CH * 0.38, CW * 0.72);
-  spot.addColorStop(0, 'rgba(110, 30, 90, 0.22)');
-  spot.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  c.fillStyle = spot;
-  c.fillRect(0, 0, CW, CH);
-
-  // ── Second warm spotlight lower-centre (around bumper cluster) ───────
-  const spot2 = c.createRadialGradient(CW * 0.5, CH * 0.44, 5, CW * 0.5, CH * 0.44, CW * 0.42);
-  spot2.addColorStop(0, 'rgba(60, 0, 80, 0.18)');
-  spot2.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  c.fillStyle = spot2;
-  c.fillRect(0, 0, CW, CH);
-
-  // ── Edge vignette ────────────────────────────────────────────────────
-  const vig = c.createRadialGradient(CW / 2, CH / 2, CH * 0.2, CW / 2, CH / 2, CH * 0.8);
-  vig.addColorStop(0, 'rgba(0,0,0,0)');
-  vig.addColorStop(1, 'rgba(0,0,0,0.72)');
-  c.fillStyle = vig;
-  c.fillRect(0, 0, CW, CH);
-
-  return _fieldCanvas;
-}
-
-// ═════════════════════════════════════════════════════════════════════════
-//  DRAW
-// ═════════════════════════════════════════════════════════════════════════
-function draw() {
-  ctx.drawImage(getFieldCanvas(), 0, 0);
-  drawAnimatedBackground();
-  drawMarqueeLights();
-  drawWalls();
-  drawSparkles();
-  drawNeonSign();
-  drawLanes();
-  drawBumpers();
-  drawStageFootlights();
-  drawBallTrail();
-  drawFlipper(LF);
-  drawFlipper(RF);
-  if (ballActive) drawBall();
-  drawPopups();
-  drawComboHint();
-}
-
-// ─────────────────────────── Sweeping spotlights ─────────────────────────
-function drawAnimatedBackground() {
-  ctx.save();
-  const sp = 0.68 + 0.32 * Math.sin(time * 0.025);
-
-  // Spotlight 1 — pink/magenta, sweeps left-right
-  const sx = CW / 2 + Math.sin(time * 0.0065) * 105;
-  const sy = CH * 0.32;
-  const s1 = ctx.createRadialGradient(sx, sy, 0, sx, sy, 210);
-  s1.addColorStop(0,   `rgba(180,0,120,${(0.20 * sp).toFixed(3)})`);
-  s1.addColorStop(0.5, `rgba(110,0,75, ${(0.08 * sp).toFixed(3)})`);
-  s1.addColorStop(1,   'rgba(0,0,0,0)');
-  ctx.fillStyle = s1;
-  ctx.fillRect(0, 0, CW, CH);
-
-  // Spotlight 2 — blue/indigo, counter-sweeps
-  const sx2 = CW / 2 + Math.cos(time * 0.0065) * 90;
-  const sy2 = CH * 0.50;
-  const s2 = ctx.createRadialGradient(sx2, sy2, 0, sx2, sy2, 165);
-  s2.addColorStop(0,   `rgba(0,20,140,${(0.14 * sp).toFixed(3)})`);
-  s2.addColorStop(0.5, `rgba(0,10,90, ${(0.06 * sp).toFixed(3)})`);
-  s2.addColorStop(1,   'rgba(0,0,0,0)');
-  ctx.fillStyle = s2;
-  ctx.fillRect(0, 0, CW, CH);
-
-  ctx.restore();
-}
-
-// ─────────────────────────── Marquee / border chase lights ───────────────
-function drawMarqueeLights() {
-  ctx.save();
-  const PAL   = ['#ff1493','#ffd700','#da70d6','#ff69b4','#cc22ff','#ff8800','#00ccff','#ff4488'];
-  const SPEED = 4;  // frames per color step
-
-  // ── Top horizontal marquee row ─────────────────────────────────────────
-  for (let x = 18; x <= 342; x += 18) {
-    const idx   = (((time / SPEED) | 0) + ((x / 18) | 0)) % PAL.length;
-    const color = PAL[(idx + PAL.length) % PAL.length];
-    const pulse = 0.55 + 0.45 * Math.sin(time * 0.22 + x * 0.09);
-    ctx.beginPath();
-    ctx.arc(x, 36, 3.2, 0, Math.PI * 2);
-    ctx.fillStyle   = color;
-    ctx.globalAlpha = 0.55 + 0.40 * pulse;
-    ctx.shadowColor = color;
-    ctx.shadowBlur  = 10 * pulse;
-    ctx.fill();
+  if (ix !== 0 || iy !== 0) {
+    const len = Math.hypot(ix, iy);
+    const nx  = ix / len, ny = iy / len;
+    p1.vx += nx * P_ACCEL;
+    p1.vy += ny * P_ACCEL;
+    const sp = Math.hypot(p1.vx, p1.vy);
+    if (sp > P_MAXSP) { p1.vx = (p1.vx / sp) * P_MAXSP; p1.vy = (p1.vy / sp) * P_MAXSP; }
+    p1.angle = Math.atan2(ny, nx);
   }
 
-  // ── Left wall chase lights ─────────────────────────────────────────────
-  for (let j = 0, y = 68; y < 490; y += 28, j++) {
-    const idx   = (((time / SPEED) | 0) + j + 2) % PAL.length;
-    const color = PAL[idx];
-    const pulse = 0.55 + 0.45 * Math.sin(time * 0.15 + y * 0.055);
-    ctx.beginPath();
-    ctx.arc(14, y, 2.6, 0, Math.PI * 2);
-    ctx.fillStyle   = color;
-    ctx.globalAlpha = 0.50 + 0.42 * pulse;
-    ctx.shadowColor = color;
-    ctx.shadowBlur  = 8 * pulse;
-    ctx.fill();
-  }
-
-  // ── Right wall chase lights (reverse direction for mirror effect) ───────
-  for (let j = 0, y = 68; y < 490; y += 28, j++) {
-    const idx   = ((((time / SPEED) | 0) - j) % PAL.length + PAL.length * 4 + 5) % PAL.length;
-    const color = PAL[idx];
-    const pulse = 0.55 + 0.45 * Math.sin(time * 0.15 + y * 0.055 + Math.PI);
-    ctx.beginPath();
-    ctx.arc(346, y, 2.6, 0, Math.PI * 2);
-    ctx.fillStyle   = color;
-    ctx.globalAlpha = 0.50 + 0.42 * pulse;
-    ctx.shadowColor = color;
-    ctx.shadowBlur  = 8 * pulse;
-    ctx.fill();
-  }
-
-  ctx.globalAlpha = 1;
-  ctx.shadowBlur  = 0;
-  ctx.restore();
+  const dashKey = keys['Space'] || keys['ShiftLeft'] || keys['ShiftRight'];
+  if (dashKey && !_dashKeyWas) triggerDash(p1);
+  _dashKeyWas = !!dashKey;
 }
 
-// ─────────────────────────── Neon sign ───────────────────────────────────
-function drawNeonSign() {
-  ctx.save();
-  const pulse   = 0.60 + 0.40 * Math.sin(time * 0.055);
-  // Rare flicker: ~2% of frames go dark for 1 frame
-  const flicker = Math.sin(time * 0.53) > 0.97 ? 0.15 : 1;
-  ctx.globalAlpha    = pulse * flicker;
-  ctx.textAlign      = 'center';
-  ctx.textBaseline   = 'middle';
-  ctx.font           = 'bold 10px Courier New';
+// ════════════════════════════════════════════════════════════
+//  AI  (p2)
+// ════════════════════════════════════════════════════════════
+const AI_SPEED = 5.2;
+const AI_REACT = 0.88;
 
-  // Outer bloom pass
-  ctx.fillStyle   = '#ff1493';
-  ctx.shadowColor = '#ff1493';
-  ctx.shadowBlur  = 22;
-  ctx.fillText('♦  VIP  DIAMONDS  ♦', CW / 2, 102);
+function updateAI(dt) {
+  if (!p2 || !ball || p2.stun > 0) return;
+  const bx = ball.x, by = ball.y;
+  const defGoalX = FX + FW;
+  const distToBall = Math.hypot(bx - p2.x, by - p2.y);
 
-  // Inner bright pass
-  ctx.fillStyle  = '#ffaad0';
-  ctx.shadowBlur = 5;
-  ctx.fillText('♦  VIP  DIAMONDS  ♦', CW / 2, 102);
+  let tx, ty;
+  const ballThreat = ball.vx > 0.8 && bx > FCX;
 
-  ctx.globalAlpha = 1;
-  ctx.shadowBlur  = 0;
-  ctx.restore();
-}
-
-// ─────────────────────────── Stage footlights ────────────────────────────
-function drawStageFootlights() {
-  ctx.save();
-  const pulse = 0.60 + 0.40 * Math.sin(time * 0.08);
-
-  for (const f of [LF, RF]) {
-    const g = ctx.createRadialGradient(f.px, f.py, 0, f.px, f.py, 80);
-    g.addColorStop(0, `rgba(255,100,180,${(0.24 * pulse).toFixed(3)})`);
-    g.addColorStop(1, 'rgba(255,20,147,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(f.px, f.py, 80, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Horizontal glow strip across the flipper zone
-  const fy    = LF.py;
-  const strip = ctx.createLinearGradient(0, fy - 28, 0, fy + 18);
-  strip.addColorStop(0, `rgba(255,20,147,${(0.08 * pulse).toFixed(3)})`);
-  strip.addColorStop(1, 'rgba(255,20,147,0)');
-  ctx.fillStyle = strip;
-  ctx.fillRect(10, fy - 28, CW - 20, 46);
-
-  ctx.restore();
-}
-
-// ─────────────────────────── Ball motion trail ───────────────────────────
-function drawBallTrail() {
-  if (ballTrail.length < 2) return;
-  ctx.save();
-  for (let i = 0; i < ballTrail.length; i++) {
-    const pct = i / ballTrail.length;
-    const r   = ball.r * pct * 0.75;
-    if (r < 0.5) continue;
-    const t = ballTrail[i];
-    ctx.beginPath();
-    ctx.arc(t.x, t.y, r, 0, Math.PI * 2);
-    ctx.fillStyle   = `rgba(180,120,255,${(pct * 0.52).toFixed(3)})`;
-    ctx.shadowColor = '#aa55ff';
-    ctx.shadowBlur  = 9 * pct;
-    ctx.fill();
-  }
-  ctx.shadowBlur = 0;
-  ctx.restore();
-}
-
-// ─────────────────────────── Walls & chrome rails ────────────────────────
-function drawWalls() {
-  ctx.save();
-
-  // Helper: draw a 3-layer chrome rail along any path
-  function chromePath(pathFn) {
-    // Layer 1 – thick dark base shadow
-    ctx.save();
-    ctx.lineWidth   = 9;
-    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
-    ctx.shadowBlur  = 0;
-    ctx.lineCap     = 'round';
-    pathFn(); ctx.stroke();
-    ctx.restore();
-
-    // Layer 2 – main metal rail with purple/magenta glow
-    ctx.save();
-    ctx.lineWidth   = 5;
-    ctx.strokeStyle = '#7020a0';
-    ctx.shadowColor = '#ff1493';
-    ctx.shadowBlur  = 14;
-    ctx.lineCap     = 'round';
-    pathFn(); ctx.stroke();
-    ctx.restore();
-
-    // Layer 3 – bright top-edge highlight
-    ctx.save();
-    ctx.lineWidth   = 1.4;
-    ctx.strokeStyle = 'rgba(210, 100, 255, 0.80)';
-    ctx.shadowBlur  = 0;
-    ctx.lineCap     = 'round';
-    pathFn(); ctx.stroke();
-    ctx.restore();
-  }
-
-  // Left wall
-  chromePath(() => { ctx.beginPath(); ctx.moveTo(10, 28); ctx.lineTo(10, CH); });
-  // Right wall
-  chromePath(() => { ctx.beginPath(); ctx.moveTo(CW - 10, 28); ctx.lineTo(CW - 10, CH); });
-  // Top arch
-  chromePath(() => { ctx.beginPath(); ctx.arc(CW / 2, 28, CW / 2 - 10, Math.PI, 0, false); });
-
-  // Gutter guide walls
-  ctx.save();
-  ctx.lineCap     = 'round';
-  ctx.lineWidth   = 4;
-  ctx.strokeStyle = '#5a1880';
-  ctx.shadowColor = '#cc44ff';
-  ctx.shadowBlur  = 8;
-  GUTTERS.forEach(g => {
-    ctx.beginPath();
-    ctx.moveTo(g.x1, g.y1);
-    ctx.lineTo(g.x2, g.y2);
-    ctx.stroke();
-  });
-  // highlight edge
-  ctx.lineWidth   = 1;
-  ctx.strokeStyle = 'rgba(180, 90, 230, 0.55)';
-  ctx.shadowBlur  = 0;
-  GUTTERS.forEach(g => {
-    ctx.beginPath();
-    ctx.moveTo(g.x1, g.y1);
-    ctx.lineTo(g.x2, g.y2);
-    ctx.stroke();
-  });
-  ctx.restore();
-
-  ctx.restore();
-}
-
-// ─────────────────────────── Rollover lanes (insert lights) ──────────────
-function drawLanes() {
-  ctx.save();
-  for (const l of LANES) {
-    // Bezel / housing ring
-    ctx.beginPath();
-    ctx.arc(l.x, l.y, l.r + 2.5, 0, Math.PI * 2);
-    const bezel = ctx.createRadialGradient(l.x - 2, l.y - 2, l.r * 0.3, l.x, l.y, l.r + 3);
-    bezel.addColorStop(0, '#48485a');
-    bezel.addColorStop(1, '#111118');
-    ctx.fillStyle = bezel;
-    ctx.fill();
-    ctx.strokeStyle = '#555568';
-    ctx.lineWidth   = 0.8;
-    ctx.stroke();
-
-    // Lens body
-    const lIdlePulse = 0.35 + 0.30 * Math.sin(time * 0.06 + l.x * 0.025);
-    ctx.beginPath();
-    ctx.arc(l.x, l.y, l.r, 0, Math.PI * 2);
-    if (l.lit) {
-      const lens = ctx.createRadialGradient(
-        l.x - l.r * 0.25, l.y - l.r * 0.28, l.r * 0.08,
-        l.x, l.y, l.r
-      );
-      lens.addColorStop(0,    '#fffce8');
-      lens.addColorStop(0.28, '#ffd700');
-      lens.addColorStop(0.65, '#cc9800');
-      lens.addColorStop(1,    '#7a5a00');
-      ctx.fillStyle   = lens;
-      ctx.shadowColor = '#ffd700';
-      ctx.shadowBlur  = 20;
-    } else {
-      // Idle: very dim gold pulse so unlit inserts feel alive
-      ctx.fillStyle   = `rgba(80,55,0,${(lIdlePulse * 0.55).toFixed(3)})`;
-      ctx.shadowColor = '#ffd700';
-      ctx.shadowBlur  = 5 * lIdlePulse;
-    }
-    ctx.fill();
-
-    // Specular highlight on lens when lit
-    if (l.lit) {
-      const spec = ctx.createRadialGradient(
-        l.x - l.r * 0.28, l.y - l.r * 0.30, 0,
-        l.x - l.r * 0.28, l.y - l.r * 0.30, l.r * 0.52
-      );
-      spec.addColorStop(0, 'rgba(255,255,255,0.82)');
-      spec.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.beginPath();
-      ctx.arc(l.x, l.y, l.r, 0, Math.PI * 2);
-      ctx.fillStyle  = spec;
-      ctx.shadowBlur = 0;
-      ctx.fill();
-    }
-
-    // Label
-    ctx.fillStyle    = l.lit ? '#000000' : '#80659a';
-    ctx.font         = 'bold 8px Courier New';
-    ctx.textAlign    = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowBlur   = 0;
-    ctx.fillText(l.label, l.x, l.y);
-  }
-  ctx.restore();
-}
-
-// ─────────────────────────── Bumpers (3-D domes) ─────────────────────────
-function drawBumpers() {
-  ctx.save();
-  for (const b of BUMPERS) {
-    const lit = b.glow > 0;
-    const gf  = b.glow / 14;  // 0..1
-
-    ctx.shadowBlur = 0;
-
-    // ── 1. Extended light halo radiating out when hit ──────────────────
-    if (lit) {
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.r + 22, 0, Math.PI * 2);
-      const halo = ctx.createRadialGradient(b.x, b.y, b.r - 2, b.x, b.y, b.r + 22);
-      halo.addColorStop(0,   hexAlpha(b.color, 0.50 * gf));
-      halo.addColorStop(0.4, hexAlpha(b.color, 0.22 * gf));
-      halo.addColorStop(1,   hexAlpha(b.color, 0));
-      ctx.fillStyle = halo;
-      ctx.fill();
-    }
-
-    // ── 2. Cast shadow (makes dome feel raised off the playfield) ──────
-    ctx.beginPath();
-    ctx.ellipse(b.x + 3, b.y + b.r * 0.48, b.r * 0.88, b.r * 0.28, 0, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(0,0,0,0.48)';
-    ctx.fill();
-
-    // ── 3. Metallic collar ring at the dome base ───────────────────────
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r + 3, 0, Math.PI * 2);
-    const collar = ctx.createRadialGradient(b.x - 3, b.y - 3, b.r * 0.35, b.x, b.y, b.r + 3.5);
-    collar.addColorStop(0,   '#5a5a70');
-    collar.addColorStop(0.6, '#28283a');
-    collar.addColorStop(1,   '#0e0e1a');
-    ctx.fillStyle = collar;
-    ctx.fill();
-
-    // ── 4. Neon indicator ring (bright when hit, pulses idle) ─────────
-    const idlePulse = 0.22 + 0.18 * Math.sin(time * 0.042 + b.x * 0.018 + b.y * 0.012);
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r + 1.5, 0, Math.PI * 2);
-    ctx.strokeStyle = lit ? b.color : hexAlpha(b.color, 0.28 + idlePulse);
-    ctx.lineWidth   = lit ? 3.5 : 2;
-    ctx.shadowColor = b.color;
-    ctx.shadowBlur  = lit ? 18 * gf + 4 : 5 * idlePulse * 2;
-    ctx.stroke();
-    ctx.shadowBlur  = 0;
-
-    // ── 5. Dome body — 3-D sphere gradient ────────────────────────────
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-    const dome = ctx.createRadialGradient(
-      b.x - b.r * 0.33, b.y - b.r * 0.35, b.r * 0.06,
-      b.x + b.r * 0.08, b.y + b.r * 0.08, b.r
-    );
-    if (lit) {
-      dome.addColorStop(0,    '#ffffff');
-      dome.addColorStop(0.18, lighten(b.color, 0.55));
-      dome.addColorStop(0.52, b.color);
-      dome.addColorStop(0.82, darken(b.color, 0.40));
-      dome.addColorStop(1,    darken(b.color, 0.72));
-    } else {
-      dome.addColorStop(0,    '#b8b8cc');
-      dome.addColorStop(0.22, '#6a6a82');
-      dome.addColorStop(0.55, '#2e2040');
-      dome.addColorStop(0.85, '#160a20');
-      dome.addColorStop(1,    '#070010');
-    }
-    ctx.fillStyle = dome;
-    ctx.fill();
-
-    // ── 6. Primary specular highlight (sharp top-left glint) ──────────
-    const spec1 = ctx.createRadialGradient(
-      b.x - b.r * 0.30, b.y - b.r * 0.33, 0,
-      b.x - b.r * 0.30, b.y - b.r * 0.33, b.r * 0.52
-    );
-    spec1.addColorStop(0,   lit ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.55)');
-    spec1.addColorStop(0.3, lit ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.12)');
-    spec1.addColorStop(1,   'rgba(255,255,255,0)');
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-    ctx.fillStyle = spec1;
-    ctx.fill();
-
-    // ── 7. Label ───────────────────────────────────────────────────────
-    const fsize = b.label.length > 3 ? 7 : (b.label.length > 2 ? 9 : 11);
-    ctx.font         = `bold ${fsize}px 'Courier New', monospace`;
-    ctx.textAlign    = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle    = lit ? '#ffffff' : 'rgba(200,170,240,0.85)';
-    ctx.shadowColor  = lit ? '#ffffff' : 'transparent';
-    ctx.shadowBlur   = lit ? 6 : 0;
-    ctx.fillText(b.label, b.x, b.y + 1);
-    ctx.shadowBlur   = 0;
-  }
-  ctx.restore();
-}
-
-// ─────────────────────────── Flippers (3-D tapered rubber) ───────────────
-function drawFlipper(f) {
-  const cos_a = Math.cos(f.angle), sin_a = Math.sin(f.angle);
-  const nx = -sin_a, ny = cos_a;          // normal perpendicular to flipper axis
-  const tx = f.px + FLEN * cos_a;
-  const ty = f.py + FLEN * sin_a;
-
-  // Tapered shape: wider at pivot, narrower at tip
-  const BW = 11, TW = 4.5;
-  const p = [
-    [f.px + nx * BW,  f.py + ny * BW ],   // base, top edge
-    [tx   + nx * TW,  ty   + ny * TW ],   // tip,  top edge
-    [tx   - nx * TW,  ty   - ny * TW ],   // tip,  bottom edge
-    [f.px - nx * BW,  f.py - ny * BW ],   // base, bottom edge
-  ];
-
-  function flipPath() {
-    ctx.beginPath();
-    ctx.moveTo(p[0][0], p[0][1]);
-    ctx.lineTo(p[1][0], p[1][1]);
-    ctx.lineTo(p[2][0], p[2][1]);
-    ctx.lineTo(p[3][0], p[3][1]);
-    ctx.closePath();
-  }
-
-  ctx.save();
-
-  // ── Drop shadow ────────────────────────────────────────────────────
-  ctx.save();
-  ctx.shadowColor   = 'rgba(0,0,0,0.80)';
-  ctx.shadowBlur    = 8;
-  ctx.shadowOffsetX = 2;
-  ctx.shadowOffsetY = 4;
-  flipPath();
-  ctx.fillStyle = 'rgba(0,0,0,0.001)';  // transparent fill triggers shadow
-  ctx.fill();
-  ctx.restore();
-
-  // ── Flipper body — gradient top-to-bottom for 3-D depth ───────────
-  const grad = ctx.createLinearGradient(
-    f.px + nx * BW, f.py + ny * BW,
-    f.px - nx * BW, f.py - ny * BW
-  );
-  if (f.pressed) {
-    grad.addColorStop(0,    '#fff080');   // bright lit edge
-    grad.addColorStop(0.10, '#e8c000');   // gold highlight
-    grad.addColorStop(0.42, '#b09000');   // mid gold
-    grad.addColorStop(0.72, '#6a5200');   // shadow side
-    grad.addColorStop(1,    '#241a00');   // dark underside
+  if (ballThreat || (bx > defGoalX - 180 && distToBall > 85)) {
+    // Defensive: intercept between ball and own goal
+    tx = bx + (defGoalX - bx) * 0.42;
+    ty = by;
   } else {
-    grad.addColorStop(0,    '#d878f5');   // bright top rim
-    grad.addColorStop(0.10, '#9030b8');   // purple body
-    grad.addColorStop(0.42, '#601888');   // mid shadow
-    grad.addColorStop(0.72, '#350a55');   // dark shadow side
-    grad.addColorStop(1,    '#100020');   // black underside
+    // Offensive: come at ball from behind (relative to p1's goal)
+    const angleToOpGoal = Math.atan2(FCY - by, FX - bx);
+    const backAngle     = angleToOpGoal + Math.PI;
+    const approachR     = (p2.r + BR) * 1.7;
+    tx = bx + Math.cos(backAngle) * approachR;
+    ty = by + Math.sin(backAngle) * approachR;
   }
-  flipPath();
-  ctx.fillStyle = grad;
-  ctx.fill();
 
-  // ── Top-edge highlight (bright rim, physically accurate bevel) ─────
+  tx = Math.max(FX + p2.r, Math.min(FX + FW - p2.r, tx));
+  ty = Math.max(FY + p2.r, Math.min(FY + FH - p2.r, ty));
+
+  const tdx = tx - p2.x, tdy = ty - p2.y;
+  const td  = Math.hypot(tdx, tdy);
+  if (td > 1) {
+    const nx = tdx / td, ny = tdy / td;
+    p2.vx += nx * P_ACCEL * AI_REACT;
+    p2.vy += ny * P_ACCEL * AI_REACT;
+    const sp = Math.hypot(p2.vx, p2.vy);
+    if (sp > AI_SPEED) { p2.vx = (p2.vx / sp) * AI_SPEED; p2.vy = (p2.vy / sp) * AI_SPEED; }
+    p2.angle = Math.atan2(ny, nx);
+  }
+
+  // AI dash when close to ball
+  p2.aiDashWait -= dt;
+  if (p2.aiDashWait <= 0 && p2.dashCooldown <= 0) {
+    if (distToBall < (p2.r + BR) * 3.5) triggerDash(p2);
+    p2.aiDashWait = 400 + Math.random() * 1000;
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  UPDATE HELPERS
+// ════════════════════════════════════════════════════════════
+function updatePlayer(p, dt) {
+  if (p.stun > 0) p.stun -= dt;
+  if (p.dashTimer    > 0) p.dashTimer    -= dt;
+  if (p.dashCooldown > 0) p.dashCooldown -= dt;
+  if (p.stun > 0) { p.vx *= P_FRIC; p.vy *= P_FRIC; }
+  p.vx *= P_FRIC; p.vy *= P_FRIC;
+  p.x  += p.vx;   p.y  += p.vy;
+  if (p.dashTimer > 0) spawnDashTrail(p.x, p.y, p.team === 0 ? C.p1 : C.p2);
+}
+
+function addShake(intensity, dur) {
+  if (intensity > shakeTtl / 4) {
+    shakeX   = (Math.random() - 0.5) * intensity;
+    shakeY   = (Math.random() - 0.5) * intensity;
+    shakeTtl = dur;
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  RENDERING HELPERS
+// ════════════════════════════════════════════════════════════
+function hexLighten(hex, amt) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `rgb(${Math.min(255,r+amt)},${Math.min(255,g+amt)},${Math.min(255,b+amt)})`;
+}
+
+function drawFieldBg() {
+  const strW = 58;
+  ctx.fillStyle = C.fieldAlt;
+  for (let x = FX; x < FX + FW; x += strW * 2)
+    ctx.fillRect(x, FY, Math.min(strW, FX + FW - x), FH);
+
+  // Goal nets
+  ctx.fillStyle = C.net;
+  ctx.fillRect(LGX1, GY, GD, GH);
+  ctx.fillRect(FX + FW, GY, GD, GH);
+  ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+  ctx.lineWidth   = 0.8;
+  for (let nx = LGX1; nx < FX; nx += 12) {
+    ctx.beginPath(); ctx.moveTo(nx, GY); ctx.lineTo(nx, GY + GH); ctx.stroke();
+  }
+  for (let ny = GY; ny < GY + GH; ny += 12) {
+    ctx.beginPath(); ctx.moveTo(LGX1, ny); ctx.lineTo(FX, ny); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(FX + FW, ny); ctx.lineTo(RGX2, ny); ctx.stroke();
+  }
+  for (let nx = FX + FW; nx < RGX2; nx += 12) {
+    ctx.beginPath(); ctx.moveTo(nx, GY); ctx.lineTo(nx, GY + GH); ctx.stroke();
+  }
+
+  // Field lines
+  ctx.strokeStyle = C.lines;
+  ctx.lineWidth   = 2.5;
+  ctx.strokeRect(FX, FY, FW, FH);
+  ctx.beginPath(); ctx.moveTo(FCX, FY); ctx.lineTo(FCX, FY + FH); ctx.stroke();
+  ctx.beginPath(); ctx.arc(FCX, FCY, 56, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = C.lines;
+  ctx.beginPath(); ctx.arc(FCX, FCY, 4, 0, Math.PI * 2); ctx.fill();
+
+  // Penalty boxes
+  ctx.lineWidth = 1.8;
+  const pW = 88, pH = 196;
+  ctx.strokeRect(FX,          FCY - pH/2, pW, pH);
+  ctx.strokeRect(FX + FW - pW, FCY - pH/2, pW, pH);
+
+  // Corner arcs
+  [[FX,    FY,     0,           Math.PI/2],
+   [FX+FW, FY,     Math.PI/2,   Math.PI],
+   [FX+FW, FY+FH,  Math.PI,     Math.PI*1.5],
+   [FX,    FY+FH,  Math.PI*1.5, Math.PI*2]
+  ].forEach(([cx,cy,sa,ea]) => {
+    ctx.beginPath(); ctx.arc(cx, cy, 18, sa, ea); ctx.stroke();
+  });
+
+  // Goal posts
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.moveTo(p[0][0], p[0][1]);
-  ctx.lineTo(p[1][0], p[1][1]);
-  ctx.strokeStyle = f.pressed ? 'rgba(255,248,160,0.90)' : 'rgba(220,130,255,0.80)';
-  ctx.lineWidth   = 1.8;
-  ctx.shadowColor = f.pressed ? '#ffd700' : '#cc88ff';
-  ctx.shadowBlur  = f.pressed ? 12 : 7;
-  ctx.lineCap     = 'round';
+  ctx.moveTo(FX, GY); ctx.lineTo(LGX1, GY);
+  ctx.lineTo(LGX1, GY + GH); ctx.lineTo(FX, GY + GH);
   ctx.stroke();
-
-  // ── Bottom-edge shadow line ────────────────────────────────────────
   ctx.beginPath();
-  ctx.moveTo(p[3][0], p[3][1]);
-  ctx.lineTo(p[2][0], p[2][1]);
-  ctx.strokeStyle = 'rgba(0,0,0,0.75)';
-  ctx.lineWidth   = 1.5;
-  ctx.shadowBlur  = 0;
+  ctx.moveTo(FX + FW, GY); ctx.lineTo(RGX2, GY);
+  ctx.lineTo(RGX2, GY + GH); ctx.lineTo(FX + FW, GY + GH);
   ctx.stroke();
+}
 
-  // ── Chrome pivot pin ───────────────────────────────────────────────
+function drawShadowEllipse(x, y, r) {
+  const g = ctx.createRadialGradient(x+3, y+5, 0, x+3, y+5, r*1.3);
+  g.addColorStop(0, 'rgba(0,0,0,0.45)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(x+3, y+7, r*1.1, r*0.45, 0, 0, Math.PI*2); ctx.fill();
+}
+
+function drawPlayer(p) {
+  const { x, y, r, team, angle, dashTimer, dashCooldown, stun } = p;
+  const col  = team === 0 ? C.p1    : C.p2;
+  const colD = team === 0 ? C.p1dk  : C.p2dk;
+  const belt = team === 0 ? C.p1belt: C.p2belt;
+
+  drawShadowEllipse(x, y, r);
+
+  if (dashTimer > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.3 + 0.2 * Math.sin(Date.now() * 0.025);
+    ctx.strokeStyle = col; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.arc(x, y, r + 8, 0, Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+
+  if (stun > 0 && Math.floor(stun / 70) % 2 === 0) {
+    ctx.save(); ctx.globalAlpha = 0.55; ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(x, y, r + 4, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  const bg = ctx.createRadialGradient(x - r*0.28, y - r*0.28, r*0.05, x, y, r);
+  bg.addColorStop(0, hexLighten(col, 55));
+  bg.addColorStop(0.5, col);
+  bg.addColorStop(1, colD);
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
+
+  // Mawashi belt + face
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(angle);
+  ctx.fillStyle = belt;
+  if (ctx.roundRect) {
+    ctx.beginPath(); ctx.roundRect(-r*0.82, -r*0.21, r*1.64, r*0.42, 4); ctx.fill();
+  } else {
+    ctx.fillRect(-r*0.82, -r*0.21, r*1.64, r*0.42);
+  }
+  ctx.fillStyle = hexLighten(belt, 40);
+  ctx.beginPath(); ctx.arc(r*0.55, 0, r*0.14, 0, Math.PI*2); ctx.fill();
+  // Eyes
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(r*0.38, -r*0.22, r*0.15, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(r*0.38,  r*0.22, r*0.15, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath(); ctx.arc(r*0.43, -r*0.22, r*0.07, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(r*0.43,  r*0.22, r*0.07, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // Specular highlight
+  ctx.save();
+  const shine = ctx.createRadialGradient(x-r*0.32, y-r*0.38, 0, x-r*0.18, y-r*0.22, r*0.55);
+  shine.addColorStop(0, 'rgba(255,255,255,0.5)');
+  shine.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = shine;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // Dash-cooldown arc
+  if (dashCooldown > 0 && dashTimer <= 0) {
+    const frac = dashCooldown / DASH_COOL;
+    ctx.save(); ctx.globalAlpha = 0.6;
+    ctx.strokeStyle = 'rgba(255,255,255,0.38)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(x, y, r + 5, -Math.PI/2, -Math.PI/2 + (1 - frac) * Math.PI * 2);
+    ctx.stroke(); ctx.restore();
+  }
+}
+
+function drawBall(b) {
+  const { x, y, r, spin } = b;
+  drawShadowEllipse(x, y, r);
+
+  const bg = ctx.createRadialGradient(x-r*0.3, y-r*0.4, 0, x, y, r);
+  bg.addColorStop(0, '#ffffff'); bg.addColorStop(0.5, C.ball); bg.addColorStop(1, C.ballDk);
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
+
+  ctx.save(); ctx.translate(x, y); ctx.rotate(spin);
+  ctx.fillStyle = '#222';
   ctx.beginPath();
-  ctx.arc(f.px, f.py, 7, 0, Math.PI * 2);
-  const pin = ctx.createRadialGradient(f.px - 2.5, f.py - 2.5, 1, f.px, f.py, 7);
-  pin.addColorStop(0,   '#e8e8e8');
-  pin.addColorStop(0.4, '#909090');
-  pin.addColorStop(1,   '#282828');
-  ctx.fillStyle   = pin;
-  ctx.shadowColor = 'rgba(0,0,0,0.7)';
-  ctx.shadowBlur  = 5;
-  ctx.fill();
+  for (let i = 0; i < 5; i++) {
+    const a = (i/5)*Math.PI*2 - Math.PI/2;
+    i === 0 ? ctx.moveTo(Math.cos(a)*r*0.37, Math.sin(a)*r*0.37)
+            : ctx.lineTo(Math.cos(a)*r*0.37, Math.sin(a)*r*0.37);
+  }
+  ctx.closePath(); ctx.fill();
+  for (let i = 0; i < 5; i++) {
+    const ba = (i/5)*Math.PI*2 + Math.PI/10;
+    const px = Math.cos(ba)*r*0.68, py = Math.sin(ba)*r*0.68;
+    ctx.beginPath();
+    for (let j = 0; j < 6; j++) {
+      const a = (j/6)*Math.PI*2 + ba;
+      const hx = px + Math.cos(a)*r*0.26, hy = py + Math.sin(a)*r*0.26;
+      j === 0 ? ctx.moveTo(hx, hy) : ctx.lineTo(hx, hy);
+    }
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
 
-  // Pin specular glint
-  ctx.beginPath();
-  ctx.arc(f.px - 2, f.py - 2, 2.5, 0, Math.PI * 2);
-  ctx.fillStyle  = 'rgba(255,255,255,0.72)';
-  ctx.shadowBlur = 0;
-  ctx.fill();
-
+  ctx.save();
+  const shine = ctx.createRadialGradient(x-r*0.28, y-r*0.38, 0, x-r*0.15, y-r*0.25, r*0.52);
+  shine.addColorStop(0, 'rgba(255,255,255,0.72)');
+  shine.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = shine;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
   ctx.restore();
 }
 
-// ─────────────────────────── Ball (chrome metal sphere) ──────────────────
-function drawBall() {
-  ctx.save();
+function drawHUD() {
+  ctx.fillStyle = C.hud;
+  ctx.fillRect(0, 0, LW, FY - 2);
+  ctx.strokeStyle = C.hudLine; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, FY-2); ctx.lineTo(LW, FY-2); ctx.stroke();
 
-  // ── 1. Soft drop shadow beneath the ball ─────────────────────────────
-  ctx.beginPath();
-  ctx.ellipse(ball.x + 2, ball.y + ball.r * 0.55, ball.r * 0.84, ball.r * 0.30, 0, 0, Math.PI * 2);
-  ctx.fillStyle  = 'rgba(0,0,0,0.52)';
-  ctx.shadowBlur = 0;
-  ctx.fill();
-
-  // ── 2. Main chrome sphere ─────────────────────────────────────────────
-  // Inner highlight centre is offset upper-left; outer fade is lower-right
-  const chrome = ctx.createRadialGradient(
-    ball.x - ball.r * 0.30, ball.y - ball.r * 0.34, ball.r * 0.04,
-    ball.x + ball.r * 0.10, ball.y + ball.r * 0.10, ball.r
-  );
-  chrome.addColorStop(0,    '#f6f6ff');   // bright specular centre
-  chrome.addColorStop(0.16, '#d8d8f0');   // near-white chrome
-  chrome.addColorStop(0.40, '#9090b8');   // mid chrome
-  chrome.addColorStop(0.65, '#505068');   // dark chrome
-  chrome.addColorStop(0.85, '#282838');   // very dark edge
-  chrome.addColorStop(1,    '#181820');   // near-black rim
-
-  ctx.beginPath();
-  ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
-  ctx.fillStyle   = chrome;
-  ctx.shadowColor = 'rgba(170,150,255,0.42)';
-  ctx.shadowBlur  = 12;
-  ctx.fill();
-  ctx.shadowBlur  = 0;
-
-  // ── 3. Primary specular highlight (sharp bright glint, upper-left) ───
-  const spec1 = ctx.createRadialGradient(
-    ball.x - ball.r * 0.33, ball.y - ball.r * 0.36, 0,
-    ball.x - ball.r * 0.33, ball.y - ball.r * 0.36, ball.r * 0.44
-  );
-  spec1.addColorStop(0,   'rgba(255,255,255,0.97)');
-  spec1.addColorStop(0.30, 'rgba(255,255,255,0.42)');
-  spec1.addColorStop(1,   'rgba(255,255,255,0)');
-  ctx.beginPath();
-  ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
-  ctx.fillStyle = spec1;
-  ctx.fill();
-
-  // ── 4. Soft ambient reflection (bottom, purple table colour tint) ─────
-  const spec2 = ctx.createRadialGradient(
-    ball.x + ball.r * 0.20, ball.y + ball.r * 0.28, 0,
-    ball.x + ball.r * 0.20, ball.y + ball.r * 0.28, ball.r * 0.48
-  );
-  spec2.addColorStop(0, 'rgba(150, 60, 200, 0.28)');
-  spec2.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.beginPath();
-  ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
-  ctx.fillStyle = spec2;
-  ctx.fill();
-
-  ctx.restore();
-}
-
-// ─────────────────────────── Score popups ────────────────────────────────
-function drawPopups() {
-  if (popups.length === 0) return;
-  ctx.save();
   ctx.textAlign = 'center';
-  for (const p of popups) {
-    const a = p.life / p.maxLife;
-    ctx.globalAlpha = a;
-    ctx.font = 'bold 14px Courier New';
-    // Inset text shadow for depth
-    ctx.fillStyle = 'rgba(60,30,0,0.65)';
-    ctx.fillText(p.text, p.x + 1, p.y + 1.5);
-    // Main text
-    ctx.fillStyle   = '#ffd700';
-    ctx.shadowColor = '#ffd700';
-    ctx.shadowBlur  = 10;
-    ctx.fillText(p.text, p.x, p.y);
+  ctx.fillStyle = C.gold; ctx.font = 'bold 13px monospace';
+  ctx.fillText('SUMO SOCCER', LW/2, 17);
+
+  ctx.fillStyle = C.p1; ctx.font = 'bold 30px monospace'; ctx.textAlign = 'right';
+  ctx.fillText(score[0], LW/2 - 28, 37);
+  ctx.fillStyle = '#555'; ctx.font = 'bold 24px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('–', LW/2, 37);
+  ctx.fillStyle = C.p2; ctx.font = 'bold 30px monospace'; ctx.textAlign = 'left';
+  ctx.fillText(score[1], LW/2 + 28, 37);
+
+  ctx.font = '10px monospace'; ctx.textAlign = 'right';
+  ctx.fillStyle = C.p1; ctx.fillText('YOU', LW/2 - 34, FY - 6);
+  ctx.fillStyle = '#444'; ctx.textAlign = 'center';
+  ctx.fillText(`FIRST TO ${GOALS_WIN}`, LW/2, FY - 6);
+  ctx.fillStyle = C.p2; ctx.textAlign = 'left';
+  ctx.fillText('CPU', LW/2 + 34, FY - 6);
+}
+
+function drawControls() {
+  ctx.fillStyle = C.ctrlBg;
+  ctx.fillRect(0, CTRL_Y, LW, LH - CTRL_Y);
+  ctx.strokeStyle = C.ctrlLine; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, CTRL_Y); ctx.lineTo(LW, CTRL_Y); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.setLineDash([4,5]);
+  ctx.beginPath(); ctx.moveTo(LW/2, CTRL_Y+6); ctx.lineTo(LW/2, LH-6); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.save(); ctx.globalAlpha = 0.82;
+
+  // Joystick
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.fillStyle   = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth   = 2;
+  ctx.beginPath(); ctx.arc(joy.bx, joy.by, JR_BASE, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1.5;
+  for (let i = 0; i < 4; i++) {
+    const a = i * Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(joy.bx + Math.cos(a)*JR_BASE*0.62, joy.by + Math.sin(a)*JR_BASE*0.62);
+    ctx.lineTo(joy.bx + Math.cos(a)*JR_BASE*0.88, joy.by + Math.sin(a)*JR_BASE*0.88);
+    ctx.stroke();
   }
-  ctx.globalAlpha = 1;
-  ctx.shadowBlur  = 0;
+  const knobG = ctx.createRadialGradient(joy.kx-4, joy.ky-4, 1, joy.kx, joy.ky, JR_KNOB);
+  knobG.addColorStop(0, 'rgba(255,255,255,0.62)');
+  knobG.addColorStop(1, 'rgba(150,150,180,0.38)');
+  ctx.fillStyle = knobG;
+  ctx.beginPath(); ctx.arc(joy.kx, joy.ky, JR_KNOB, 0, Math.PI*2); ctx.fill();
+
+  // Dash button
+  const cool  = p1 ? Math.max(0, p1.dashCooldown / DASH_COOL) : 0;
+  const ready = cool <= 0;
+  if (ready) {
+    ctx.save();
+    ctx.globalAlpha = 0.28 + 0.18 * Math.sin(Date.now() * 0.006);
+    ctx.strokeStyle = '#ff2244'; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.arc(DBX, DBY, DB_R + 7, 0, Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.fillStyle   = ready ? 'rgba(255,25,55,0.28)' : 'rgba(70,70,100,0.22)';
+  ctx.strokeStyle = ready ? 'rgba(255,55,75,0.65)' : 'rgba(90,90,120,0.38)';
+  ctx.lineWidth   = 3;
+  ctx.beginPath(); ctx.arc(DBX, DBY, DB_R, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  if (cool > 0) {
+    ctx.save(); ctx.globalAlpha = 0.42; ctx.fillStyle = 'rgba(255,70,90,0.5)';
+    ctx.beginPath(); ctx.moveTo(DBX, DBY);
+    ctx.arc(DBX, DBY, DB_R, -Math.PI/2, -Math.PI/2 + (1-cool)*Math.PI*2);
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  ctx.font = '26px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = ready ? 'rgba(255,255,255,0.9)' : 'rgba(110,110,150,0.6)';
+  ctx.fillText('⚡', DBX, DBY);
+  ctx.textBaseline = 'alphabetic';
+
+  ctx.globalAlpha = 0.42; ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('MOVE', joy.bx, joy.by + JR_BASE + 17);
+  ctx.fillText('DASH', DBX,    DBY    + DB_R    + 17);
   ctx.restore();
 }
 
-// ─────────────────────────── Combo hint ──────────────────────────────────
-function drawComboHint() {
-  if (combo <= 1 || comboTimer <= 0) return;
-  ctx.save();
-  ctx.textAlign   = 'center';
-  const a = Math.min(1, comboTimer / 20);
-  ctx.globalAlpha = a;
-  ctx.font        = 'bold 13px Courier New';
-  // Shadow
-  ctx.fillStyle = 'rgba(60,40,0,0.6)';
-  ctx.fillText(`× ${combo} COMBO`, CW / 2 + 1, CH - 21);
-  // Main
-  ctx.fillStyle   = '#ffd700';
-  ctx.shadowColor = '#ffd700';
-  ctx.shadowBlur  = 12;
-  ctx.fillText(`× ${combo} COMBO`, CW / 2, CH - 22);
+// ── Overlay screens ──────────────────────────────────────────
+function drawMenu() {
+  ctx.fillStyle = 'rgba(0,0,0,0.78)';
+  ctx.fillRect(0, 0, LW, LH);
+  const t = Date.now() * 0.001;
+  ctx.textAlign = 'center';
+
+  const pulse = 1 + 0.03 * Math.sin(t * 1.1);
+  ctx.save(); ctx.translate(LW/2, LH/2 - 100); ctx.scale(pulse, pulse);
+  ctx.fillStyle = C.gold; ctx.font = 'bold 54px monospace'; ctx.fillText('SUMO', 0, 0);
+  ctx.restore();
+  ctx.save(); ctx.translate(LW/2, LH/2 - 42); ctx.scale(pulse, pulse);
+  ctx.fillStyle = C.p1; ctx.font = 'bold 54px monospace'; ctx.fillText('SOCCER', 0, 0);
+  ctx.restore();
+
+  // VS graphic
+  const cy = LH/2 + 14;
+  ctx.fillStyle = C.p1; ctx.beginPath(); ctx.arc(LW/2-55, cy, 22, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = C.p1belt; ctx.fillRect(LW/2-72, cy-4, 34, 8);
+  ctx.fillStyle = C.p2; ctx.beginPath(); ctx.arc(LW/2+55, cy, 22, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = C.p2belt; ctx.fillRect(LW/2+38, cy-4, 34, 8);
+  ctx.fillStyle = '#888'; ctx.font = 'bold 26px monospace'; ctx.fillText('VS', LW/2, cy + 8);
+  ctx.fillStyle = '#ccc'; ctx.font = '11px monospace';
+  ctx.fillText('YOU', LW/2-55, cy+40); ctx.fillText('CPU', LW/2+55, cy+40);
+
+  ctx.fillStyle = '#aaa'; ctx.font = '14px monospace';
+  ctx.fillText(`First to ${GOALS_WIN} goals wins!`, LW/2, LH/2 + 75);
+  ctx.fillStyle = '#555'; ctx.font = '12px monospace';
+  ctx.fillText('WASD / Arrows · Space = Dash  |  On-screen joystick + ⚡', LW/2, LH/2 + 100);
+
+  const blink = 0.5 + 0.5 * Math.sin(t * 3.5);
+  ctx.globalAlpha = 0.5 + 0.5 * blink;
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 20px monospace';
+  ctx.fillText('TAP  /  CLICK  TO  PLAY', LW/2, LH/2 + 148);
   ctx.globalAlpha = 1;
-  ctx.shadowBlur  = 0;
+}
+
+function drawGoalOverlay() {
+  const teamCol  = scoredTeam === 0 ? C.p1 : C.p2;
+  const teamName = scoredTeam === 0 ? 'YOU SCORE!' : 'CPU SCORES!';
+  const progress = 1 - goalTimer / GOAL_PAUSE;
+  const fadeIn   = Math.min(1, progress * 6);
+  const fadeOut  = progress > 0.72 ? Math.max(0, 1 - (progress - 0.72) / 0.28) : 1;
+  const alpha    = fadeIn * fadeOut;
+
+  ctx.save(); ctx.globalAlpha = alpha * 0.55;
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, LW, LH);
+  ctx.globalAlpha = alpha;
+
+  const scale = 1 + 0.06 * Math.sin(Date.now() * 0.012);
+  ctx.translate(LW/2, LH/2 - 28);
+  ctx.scale(scale, scale);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = teamCol; ctx.font = 'bold 74px monospace'; ctx.fillText('GOAL!', 0, 0);
+  ctx.scale(1/scale, 1/scale);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 26px monospace'; ctx.fillText(teamName, 0, 52);
+  ctx.font = 'bold 34px monospace';
+  ctx.fillStyle = C.p1; ctx.fillText(score[0], -44, 104);
+  ctx.fillStyle = '#666'; ctx.fillText('–', 0, 104);
+  ctx.fillStyle = C.p2; ctx.fillText(score[1], 44, 104);
   ctx.restore();
 }
+
+function drawGameOver() {
+  ctx.fillStyle = 'rgba(0,0,0,0.86)'; ctx.fillRect(0, 0, LW, LH);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = C.gold; ctx.font = 'bold 46px monospace'; ctx.fillText('GAME OVER', LW/2, LH/2 - 82);
+
+  const wCol  = winner === 0 ? C.p1 : C.p2;
+  const wText = winner === 0 ? 'YOU WIN!' : 'CPU WINS!';
+  ctx.fillStyle = wCol; ctx.font = 'bold 38px monospace'; ctx.fillText(wText, LW/2, LH/2 - 28);
+
+  ctx.font = 'bold 56px monospace';
+  ctx.fillStyle = C.p1; ctx.fillText(score[0], LW/2 - 56, LH/2 + 42);
+  ctx.fillStyle = '#555'; ctx.font = 'bold 40px monospace'; ctx.fillText('–', LW/2, LH/2 + 42);
+  ctx.fillStyle = C.p2; ctx.font = 'bold 56px monospace'; ctx.fillText(score[1], LW/2 + 56, LH/2 + 42);
+  ctx.fillStyle = '#555'; ctx.font = '12px monospace'; ctx.fillText('YOU            CPU', LW/2, LH/2 + 60);
+
+  const blink = 0.5 + 0.5 * Math.sin(Date.now() * 0.004);
+  ctx.globalAlpha = 0.5 + 0.5 * blink;
+  ctx.fillStyle = '#aaa'; ctx.font = 'bold 18px monospace'; ctx.fillText('TAP TO PLAY AGAIN', LW/2, LH/2 + 112);
+  ctx.globalAlpha = 1;
+}
+
+// ════════════════════════════════════════════════════════════
+//  GAME MANAGEMENT
+// ════════════════════════════════════════════════════════════
+function startGame() {
+  score  = [0, 0]; winner = -1;
+  p1     = makePlayer(FCX - 155, FCY, 0);
+  p2     = makePlayer(FCX + 155, FCY, 1);
+  ball   = makeBall();
+  particles.length = 0;
+  shakeX = shakeY = shakeTtl = 0;
+  mode   = 'playing';
+}
+
+function resetRound() {
+  p1.x = FCX - 155; p1.y = FCY; p1.vx = 0; p1.vy = 0; p1.stun = 0; p1.angle = 0;
+  p2.x = FCX + 155; p2.y = FCY; p2.vx = 0; p2.vy = 0; p2.stun = 0; p2.angle = Math.PI;
+  ball = makeBall();
+  shakeX = shakeY = shakeTtl = 0;
+}
+
+function onGoalScored(team) {
+  score[team]++;
+  scoredTeam = team;
+  spawnGoalBurst(ball.x, ball.y, team === 0 ? C.p1 : C.p2);
+  spawnConfetti(LW / 2, FY + 80);
+  addShake(24, 600);
+  playGoalSfx();
+  if (navigator.vibrate) navigator.vibrate([100, 40, 120]);
+
+  if (score[team] >= GOALS_WIN) { winner = team; mode = 'gameover'; }
+  else { mode = 'goal'; goalTimer = GOAL_PAUSE; }
+}
+
+// ════════════════════════════════════════════════════════════
+//  MAIN UPDATE
+// ════════════════════════════════════════════════════════════
+let lastTS = 0;
+
+function update(ts) {
+  const dt = Math.min(ts - lastTS, 60);
+  lastTS = ts;
+  matchAnim++;
+
+  // Shake decay
+  if (shakeTtl > 0) {
+    shakeTtl -= dt;
+    const i = Math.max(0, shakeTtl / 60);
+    shakeX = (Math.random() - 0.5) * i;
+    shakeY = (Math.random() - 0.5) * i;
+    if (shakeTtl <= 0) shakeX = shakeY = 0;
+  }
+
+  updateParticles(dt / 16);
+
+  if (mode === 'menu' || mode === 'gameover') return;
+  if (mode === 'goal') {
+    goalTimer -= dt;
+    if (goalTimer <= 0) { mode = 'playing'; resetRound(); }
+    return;
+  }
+
+  // ─── Playing ───────────────────────────────────────────────
+  applyPlayerInput();
+  updateAI(dt);
+  updatePlayer(p1, dt);
+  updatePlayer(p2, dt);
+
+  ball.vx *= B_FRIC; ball.vy *= B_FRIC;
+  ball.x  += ball.vx; ball.y  += ball.vy;
+  ball.spin += ball.spinV; ball.spinV *= 0.95;
+
+  // p1 ↔ ball
+  if (circleCollide(p1, ball)) {
+    const imp = Math.hypot(ball.vx, ball.vy);
+    ball.spinV += (Math.random()-0.5) * imp * 0.18;
+    const nx = (ball.x-p1.x)/(p1.r+ball.r), ny = (ball.y-p1.y)/(p1.r+ball.r);
+    if (imp > 3) { spawnHitSparks(ball.x, ball.y, nx, ny, Math.min(1,imp/13)); playKick(Math.min(1,imp/11)); }
+    if (imp > 9) addShake(imp*0.65, 130);
+  }
+
+  // p2 ↔ ball
+  if (circleCollide(p2, ball)) {
+    const imp = Math.hypot(ball.vx, ball.vy);
+    ball.spinV += (Math.random()-0.5) * imp * 0.18;
+    const nx = (ball.x-p2.x)/(p2.r+ball.r), ny = (ball.y-p2.y)/(p2.r+ball.r);
+    if (imp > 3) { spawnHitSparks(ball.x, ball.y, nx, ny, Math.min(1,imp/13)); playKick(Math.min(1,imp/11)); }
+    if (imp > 9) addShake(imp*0.65, 130);
+  }
+
+  // p1 ↔ p2 (sumo clash!)
+  if (circleCollide(p1, p2)) {
+    const relV = Math.hypot(p1.vx - p2.vx, p1.vy - p2.vy);
+    if (relV > 4) {
+      spawnHitSparks((p1.x+p2.x)/2, (p1.y+p2.y)/2, 0, -1, Math.min(1, relV/17));
+      addShake(relV * 1.1, 220);
+      playBump(Math.min(1, relV / 14));
+      if (navigator.vibrate) navigator.vibrate(20);
+    }
+    if (p1.dashTimer > 0 && relV > 7) p2.stun = 440;
+    if (p2.dashTimer > 0 && relV > 7) p1.stun = 440;
+  }
+
+  boundPlayer(p1); boundPlayer(p2); boundBall(ball);
+
+  const g = checkGoal();
+  if (g >= 0) onGoalScored(g);
+}
+
+// ════════════════════════════════════════════════════════════
+//  RENDER
+// ════════════════════════════════════════════════════════════
+function render() {
+  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, LW, LH);
+
+  if (shakeX || shakeY) { ctx.save(); ctx.translate(shakeX, shakeY); }
+
+  ctx.fillStyle = C.field; ctx.fillRect(FX, FY, FW, FH);
+  drawFieldBg();
+  drawParticles();
+  if (p1 && p2 && ball) { drawPlayer(p1); drawPlayer(p2); drawBall(ball); }
+
+  if (shakeX || shakeY) ctx.restore();
+
+  if (p1 && p2) drawHUD();
+  drawControls();
+
+  if (mode === 'menu')     drawMenu();
+  if (mode === 'goal')     drawGoalOverlay();
+  if (mode === 'gameover') drawGameOver();
+}
+
+// ════════════════════════════════════════════════════════════
+//  GAME LOOP
+// ════════════════════════════════════════════════════════════
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+requestAnimationFrame(ts => { lastTS = ts; requestAnimationFrame(loop); });
+
+function loop(ts) { update(ts); render(); requestAnimationFrame(loop); }

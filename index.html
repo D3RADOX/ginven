@@ -2,44 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
-  <title>Al's Diamond Cabaret Pinball</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <title>Sumo Soccer</title>
   <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
-  <div id="wrapper">
-    <div id="hud">
-      <div class="hud-block">
-        <div class="hud-label">SCORE</div>
-        <div class="hud-val" id="score-el">0</div>
-      </div>
-      <div id="hud-title">
-        <div class="hud-name">AL'S</div>
-        <div class="hud-sub">♦ DIAMOND CABARET ♦</div>
-      </div>
-      <div class="hud-block">
-        <div class="hud-label">BALLS</div>
-        <div class="hud-val" id="balls-el">3</div>
-      </div>
-    </div>
-
-    <div id="canvas-wrap">
-      <canvas id="c" width="360" height="580"></canvas>
-      <div id="overlay" class="hidden">
-        <div class="overlay-box">
-          <h2 id="ov-title">GAME OVER</h2>
-          <div id="ov-score"></div>
-          <button id="ov-btn">PLAY AGAIN</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="flip-row">
-      <button id="btn-left"  class="flip-btn">◀ LEFT</button>
-      <button id="btn-right" class="flip-btn">RIGHT ▶</button>
-    </div>
-    <div id="hint">TAP BUTTONS · Z / ← left · / / → right</div>
-  </div>
+  <canvas id="gameCanvas"></canvas>
   <script src="script.js"></script>
 </body>
 </html>
