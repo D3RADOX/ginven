@@ -429,24 +429,34 @@ export default function App() {
     const dis = DISCIPLINE_LEVELS.find(d => d.id === discipline);
 
     setWrestlers(prev => prev.map(w => {
-      if (w.injured) return { ...w, injuryDays: Math.max(0, w.injuryDays - 1), injured: w.injuryDays > 1 };
+      if (w.injured) {
+        const newInjuryDays = Math.max(0, w.injuryDays - 1);
+        return { ...w, injuryDays: newInjuryDays, injured: newInjuryDays > 0 };
+      }
 
-      let fat  = clamp(w.condition.fatigue   + pol.fatigue   * 0.32, 0, 100);
-      let mor  = clamp(w.condition.morale    + pol.morale    * 0.32 + dis.moraleEff * 0.28, 0, 100);
-      let disc = clamp(w.condition.discipline + dis.discEff  * 0.28, 0, 100);
+      let fat  = w.condition.fatigue   + pol.fatigue   * 0.32;
+      let mor  = w.condition.morale    + pol.morale    * 0.32 + dis.moraleEff * 0.28;
+      let disc = w.condition.discipline + dis.discEff  * 0.28;
 
-      // Personality modifiers
+      // Personality modifiers (applied before clamping)
       if (w.personality === 'Workhorse')          fat  -= 0.6;
       if (w.personality === 'Lazy Talent')        { mor += 0.8; disc -= 0.8; }
       if (w.personality === 'Hothead' && discipline === 'iron')  mor -= 1.8;
-      if (w.personality === 'Fragile Confidence' && mor < 45)    mor -= 1;
+      if (w.personality === 'Fragile Confidence' && mor < 45)    mor = Math.max(30, mor - 0.5);
       if (w.personality === 'Natural Leader')     { disc += 0.4; mor += 0.3; }
       if (w.personality === 'Silent Grinder')     fat  -= 0.3;
       if (w.personality === 'Showboat' && mor > 70) disc -= 0.4;
       if (w.personality === 'Stoic')              { fat -= 0.2; mor += 0.1; }
 
+      fat  = clamp(fat,  0, 100);
+      mor  = clamp(mor,  0, 100);
+      disc = clamp(disc, 0, 100);
+
       // Injury check
-      const injProb = (pol.injuryRisk ? 0.05 : 0.009) * (w.hidden.injuryProne ? 2 : 1) * (fat / 90);
+      const injProb = Math.min(
+        pol.injuryRisk ? 0.15 : 0.05,
+        (pol.injuryRisk ? 0.05 : 0.009) * (w.hidden.injuryProne ? 2 : 1) * (fat / 90)
+      );
       let injured = w.injured, injuryDays = w.injuryDays;
       if (Math.random() < injProb) { injured = true; injuryDays = ri(3, 14); pushEvent('warning', `${w.name} has picked up an injury — ${ri(3,14)} training sessions out.`); }
 
@@ -466,7 +476,7 @@ export default function App() {
       const picks = [
         'A local sponsor enquiry arrives. Potential boost to funds.',
         'A media outlet requests an interview with your stable.',
-        `${wrestlers[ri(0, wrestlers.length - 1)]?.name ?? 'A wrestler'} had a breakthrough training session.`,
+        `${wrestlers.length > 0 ? wrestlers[ri(0, wrestlers.length - 1)].name : 'A wrestler'} had a breakthrough training session.`,
         'Rival stable scouts were spotted near your training facility.',
         'A young fan sends an encouraging letter to the stable.',
         'Your stable\'s record is being discussed in sumo circles.',
@@ -489,7 +499,11 @@ export default function App() {
   const startBasho = () => {
     const active = wrestlers.filter(w => !w.injured).slice(0, 4);
     const bouts  = active.map((w, i) => ({ id:i+1, w, opp: STOCK_OPPONENTS[i % STOCK_OPPONENTS.length], result:null, boutData:null }));
-    setBasho({ name:'January Basho', day:1, bouts });
+    const BASHO_MONTHS = [1, 3, 5, 7, 9, 11];
+    const BASHO_NAMES  = ['January', 'March', 'May', 'July', 'September', 'November'];
+    const bashoIdx  = BASHO_MONTHS.indexOf(stable.month);
+    const bashoName = bashoIdx !== -1 ? `${BASHO_NAMES[bashoIdx]} Basho` : 'Grand Tournament';
+    setBasho({ name: bashoName, day:1, bouts });
   };
 
   const resolveBout = (id) => {
