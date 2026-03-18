@@ -31,6 +31,26 @@ const DISCIPLINE_LEVELS = [
   { id: 'iron',     name: 'Iron',     moraleEff: -6, discEff: 8,  desc: 'Absolute discipline. High burnout risk.' },
 ];
 
+const PERKS = [
+  { id:'iron_body',   name:'Iron Body',       icon:'🛡', desc:'+6 EFF — Endurance from relentless conditioning.',         req:{ stamina:70 },                 cost:3, effBonus:6  },
+  { id:'quickstep',   name:'Quickstep',        icon:'⚡', desc:'+5 EFF — Explosive first-step at the tachiai.',            req:{ speed:70 },                   cost:3, effBonus:5  },
+  { id:'iron_grip',   name:'Iron Grip',         icon:'✊', desc:'+7 EFF — Dominant belt control in grappling.',            req:{ technique:75 },               cost:4, effBonus:7  },
+  { id:'mental_fort', name:'Mental Fortress',   icon:'🧠', desc:'+5 EFF — Unshakeable composure under pressure.',          req:{ mental:70 },                  cost:3, effBonus:5  },
+  { id:'war_machine', name:'War Machine',        icon:'💥', desc:'+8 EFF — Overwhelming force that punishes mistakes.',     req:{ power:80 },                   cost:4, effBonus:8  },
+  { id:'low_center',  name:'Low Center',         icon:'⚖', desc:'+5 EFF — Perfect balance makes throws nearly impossible.',req:{ balance:70 },                 cost:3, effBonus:5  },
+  { id:'veteran',     name:'Veteran',            icon:'🎖', desc:'+4 EFF — Years of experience sharpen every response.',   req:{ age:28 },                     cost:2, effBonus:4  },
+  { id:'prodigy',     name:'Prodigy',            icon:'🌟', desc:'+10 EFF — Rare talent that defies normal limits.',        req:{ growthRate:0.9, age_max:23 }, cost:5, effBonus:10 },
+];
+
+function perkMet(perk, w) {
+  return Object.entries(perk.req).every(([k, v]) => {
+    if (k === 'age')        return (w.age || 0) >= v;
+    if (k === 'age_max')    return (w.age || 0) <= v;
+    if (k === 'growthRate') return (w.hidden?.growthRate || 0) >= v;
+    return (w.stats?.[k] || 0) >= v;
+  });
+}
+
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const BASHO_MONTHS = [1, 3, 5, 7, 9, 11]; // Jan, Mar, May, Jul, Sep, Nov
 
@@ -73,6 +93,7 @@ function makeWrestler(id, name, rank, age, stats, personality, kimarite) {
     record: { wins: ri(0, 25), losses: ri(0, 20) },
     injured: false, injuryDays: 0,
     streak: 0,
+    sp: 0, perks: [],
     hidden: { growthRate: 0.4 + Math.random() * 0.8, injuryProne: Math.random() < 0.2, peakAge: ri(26, 32) },
   };
 }
@@ -94,11 +115,11 @@ const INITIAL_PROSPECTS = [
 ];
 
 const STOCK_OPPONENTS = [
-  { id:201, name:'Tanaka Yūji',    rank:'Maegashira 2',  stats:{power:80,technique:75,speed:70,balance:72,stamina:78,mental:73}, condition:{morale:80,fatigue:22,discipline:75}, kimarite:'Uwatenage',   personality:'Stoic' },
-  { id:202, name:'Inoue Ryōta',    rank:'Maegashira 5',  stats:{power:73,technique:78,speed:72,balance:76,stamina:70,mental:75}, condition:{morale:72,fatigue:30,discipline:68}, kimarite:'Yorikiri',    personality:'Natural Leader' },
-  { id:203, name:'Mori Kazuhiko',  rank:'Maegashira 10', stats:{power:68,technique:65,speed:75,balance:70,stamina:66,mental:72}, condition:{morale:65,fatigue:20,discipline:70}, kimarite:'Hatakikomi',  personality:'Hothead' },
-  { id:204, name:'Aoki Shinnosuke',rank:'Juryo 3',       stats:{power:74,technique:68,speed:64,balance:67,stamina:72,mental:66}, condition:{morale:70,fatigue:28,discipline:72}, kimarite:'Oshidashi',   personality:'Workhorse' },
-  { id:205, name:'Yoshida Taiga',  rank:'Juryo 9',       stats:{power:62,technique:71,speed:78,balance:73,stamina:60,mental:80}, condition:{morale:78,fatigue:18,discipline:65}, kimarite:'Tsukiotoshi', personality:'Silent Grinder' },
+  { id:201, name:'Tanaka Yūji',    rank:'Maegashira 2',  stats:{power:80,technique:75,speed:70,balance:72,stamina:78,mental:73}, condition:{morale:80,fatigue:22,discipline:75}, kimarite:'Uwatenage',   personality:'Stoic',          sp:0, perks:[] },
+  { id:202, name:'Inoue Ryōta',    rank:'Maegashira 5',  stats:{power:73,technique:78,speed:72,balance:76,stamina:70,mental:75}, condition:{morale:72,fatigue:30,discipline:68}, kimarite:'Yorikiri',    personality:'Natural Leader', sp:0, perks:[] },
+  { id:203, name:'Mori Kazuhiko',  rank:'Maegashira 10', stats:{power:68,technique:65,speed:75,balance:70,stamina:66,mental:72}, condition:{morale:65,fatigue:20,discipline:70}, kimarite:'Hatakikomi',  personality:'Hothead',        sp:0, perks:[] },
+  { id:204, name:'Aoki Shinnosuke',rank:'Juryo 3',       stats:{power:74,technique:68,speed:64,balance:67,stamina:72,mental:66}, condition:{morale:70,fatigue:28,discipline:72}, kimarite:'Oshidashi',   personality:'Workhorse',      sp:0, perks:[] },
+  { id:205, name:'Yoshida Taiga',  rank:'Juryo 9',       stats:{power:62,technique:71,speed:78,balance:73,stamina:60,mental:80}, condition:{morale:78,fatigue:18,discipline:65}, kimarite:'Tsukiotoshi', personality:'Silent Grinder', sp:0, perks:[] },
 ];
 
 const OPPONENT_NAMES = [
@@ -116,7 +137,8 @@ function calcEffective(w) {
   const s = w.stats;
   const c = w.condition;
   const base = (s.power + s.technique + s.speed + s.balance + s.stamina + s.mental) / 6;
-  return Math.max(1, base + (c.morale - 50) * 0.15 - c.fatigue * 0.2 + c.discipline * 0.05);
+  const perkBonus = (w.perks || []).reduce((sum, pid) => sum + (PERKS.find(p => p.id === pid)?.effBonus ?? 0), 0);
+  return Math.max(1, base + (c.morale - 50) * 0.15 - c.fatigue * 0.2 + c.discipline * 0.05 + perkBonus);
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -897,7 +919,7 @@ function renderIntroFrame(ctx, W, H, step, t, vis1, vis2, w1, w2) {
   for (let y = 0; y < H; y += 2) ctx.fillRect(0, y, W, 1);
 }
 
-function WrestlerPortrait({ wrestler, side }) {
+function WrestlerPortrait({ wrestler, side, style: styleProp = {} }) {
   const cvRef = useRef(null);
   const vis = wrestlerVisuals(wrestler);
 
@@ -925,7 +947,7 @@ function WrestlerPortrait({ wrestler, side }) {
     <canvas
       ref={cvRef}
       width={68} height={82}
-      style={{ width: 54, height: 66, borderRadius: 6, border: '1px solid #1c1c36', flexShrink: 0, display: 'block' }}
+      style={{ width: 54, height: 66, borderRadius: 6, border: '1px solid #1c1c36', flexShrink: 0, display: 'block', ...styleProp }}
     />
   );
 }
@@ -1587,7 +1609,11 @@ export default function App() {
         }
       });
 
-      return { ...w, stats: newStats, condition: { morale: mor, fatigue: fat, discipline: disc }, injured, injuryDays };
+      // SP earning from training — intensive/focused policies reward more
+      const spChance = pol.id === 'light' ? 0 : pol.id === 'intensive' ? 0.28 : (pol.id === 'power' || pol.id === 'technique') ? 0.18 : 0.12;
+      const newSP = Math.random() < spChance * w.hidden.growthRate ? (w.sp || 0) + 1 : (w.sp || 0);
+
+      return { ...w, stats: newStats, condition: { morale: mor, fatigue: fat, discipline: disc }, injured, injuryDays, sp: newSP };
     }));
 
     // Rare heya events
@@ -1668,6 +1694,10 @@ export default function App() {
         return updatedBasho;
       });
     }
+    // Award 1 SP for a win
+    if (bd.winner === 'w1' && !entry.result) {
+      setWrestlers(prev => prev.map(wr => wr.id === w.id ? { ...wr, sp: (wr.sp || 0) + 1 } : wr));
+    }
     // Calculate if this win would achieve kachi-koshi
     const currentDays = basho?.schedule[w.id] || [];
     const currentWins = currentDays.filter(d => d.result === 'win').length + (bd.winner === 'w1' && !entry.result ? 1 : 0);
@@ -1688,6 +1718,10 @@ export default function App() {
       );
       return { ...prev, schedule: newSched };
     });
+    // Award 1 SP for a win
+    if (bd.winner === 'w1') {
+      setWrestlers(prev => prev.map(wr => wr.id === w.id ? { ...wr, sp: (wr.sp || 0) + 1 } : wr));
+    }
   };
 
   // Advance to the next basho day
@@ -1719,7 +1753,8 @@ export default function App() {
       const newStreak = res.kachiKoshi
         ? (w.streak < 0 ? 1 : w.streak + 1)
         : (w.streak > 0 ? -1 : w.streak - 1);
-      return { ...w, rank: res.newRank, record: newRecord, streak: newStreak };
+      const kachiBonus = res.kachiKoshi ? 2 : 0;
+      return { ...w, rank: res.newRank, record: newRecord, streak: newStreak, sp: (w.sp || 0) + kachiBonus };
     }));
 
     // Reputation change
@@ -1789,12 +1824,68 @@ export default function App() {
         );
       })()}
 
-      {/* Avg condition */}
-      <Section label={lang === 'EN' ? 'STABLE STATUS' : 'HEYA STATUS (部屋の状態)'}>
-        <Card elevated style={{ margin:'0 16px', padding:'14px' }}>
-          {['morale','fatigue','discipline'].map(s => <CondBar key={s} stat={s} val={avgCond(s)} />)}
-        </Card>
+      {/* Command Center — wrestler tiles */}
+      <Section label="COMMAND CENTER">
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, margin:'0 16px' }}>
+          {wrestlers.map(w => {
+            const eff = Math.round(calcEffective(w));
+            const hasSP      = (w.sp || 0) > 0;
+            const overTrained = w.condition.fatigue > 72;
+            const lowMorale   = w.condition.morale < 42;
+            const alert = w.injured ? 'INJURED' : overTrained ? 'OVERTRAINED' : lowMorale ? 'LOW MORALE' : hasSP ? `${w.sp} SP READY` : null;
+            const alertColor  = w.injured || overTrained ? RED : lowMorale ? ORANGE : GOLD;
+            return (
+              <div key={w.id} onClick={() => { setTab('roster'); setSelW(w); }}
+                style={{ background:'#0d0d1c', borderRadius:10, padding:'10px', cursor:'pointer',
+                         border:`1px solid ${hasSP ? 'rgba(201,168,76,0.35)' : w.injured ? '#2a1010' : overTrained ? '#2a1a10' : '#181830'}`,
+                         boxShadow: hasSP ? '0 0 10px rgba(201,168,76,0.08)' : 'none' }}>
+                <div style={{ display:'flex', alignItems:'flex-start', gap:7, marginBottom:6 }}>
+                  <WrestlerPortrait wrestler={w} side="left" style={{ width:38, height:46, flexShrink:0 }} />
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ color:'#d8d8f0', fontSize:12, fontFamily:'Noto Serif JP,serif', fontWeight:700, lineHeight:1.2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{w.name}</div>
+                    <div style={{ color:'#2a2a48', fontSize:8, fontFamily:'JetBrains Mono,monospace', marginTop:1 }}>{w.rank}</div>
+                    <div style={{ color:w.injured ? RED : GOLD, fontSize:17, fontWeight:700, fontFamily:'JetBrains Mono,monospace', marginTop:2 }}>{eff}</div>
+                  </div>
+                </div>
+                {/* Fatigue mini-bar */}
+                <div style={{ height:3, background:'#12122a', borderRadius:2, overflow:'hidden', marginBottom:4 }}>
+                  <div style={{ height:'100%', width:`${w.condition.fatigue}%`, background: overTrained ? RED : '#e8a840', borderRadius:2 }} />
+                </div>
+                {alert && (
+                  <div style={{ color:alertColor, fontSize:8, fontFamily:'JetBrains Mono,monospace', letterSpacing:1, fontWeight:700 }}>{alert} ›</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </Section>
+
+      {/* Smart Alerts */}
+      {(() => {
+        const alerts = [];
+        wrestlers.forEach(w => {
+          if (w.condition.fatigue > 72 && !w.injured)
+            alerts.push({ type:'warning', text:`${w.name}'s fatigue is critical (${Math.round(w.condition.fatigue)}). Switch to Butsukari-geiko recovery.`, action: () => { setWrestlerPolicies(p => ({...p, [w.id]:'light'})); setTab('train'); } });
+          if ((w.sp || 0) > 0)
+            alerts.push({ type:'sp', text:`${w.name} has ${w.sp} stat point${w.sp>1?'s':''} ready to allocate.`, action: () => { setTab('roster'); setSelW(w); } });
+          if (w.condition.morale < 38 && !w.injured)
+            alerts.push({ type:'warning', text:`${w.name}'s morale is dangerously low (${Math.round(w.condition.morale)}). Consider Lenient culture or light training.`, action: () => setTab('train') });
+        });
+        if (alerts.length === 0) return null;
+        return (
+          <Section label={`ACTION NEEDED (${alerts.length})`}>
+            {alerts.slice(0, 5).map((a, i) => (
+              <div key={i} onClick={a.action}
+                style={{ margin:'0 16px 6px', padding:'10px 14px', background:'#0d0d1c', borderRadius:10,
+                         borderLeft:`3px solid ${a.type==='sp' ? GOLD : ORANGE}`, cursor:'pointer',
+                         display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <p style={{ color:'#9898b8', fontFamily:'Noto Serif JP,serif', fontSize:12, lineHeight:1.4, margin:0, flex:1 }}>{a.text}</p>
+                <span style={{ color:'#333', fontSize:16, marginLeft:8, flexShrink:0 }}>›</span>
+              </div>
+            ))}
+          </Section>
+        );
+      })()}
 
       {/* Inbox */}
       <Section label={`JIMUSHO · INBOX (${events.length})`}>
@@ -1858,6 +1949,81 @@ export default function App() {
           </div>
         </Card>
       </Section>
+
+      {/* ── STAT ALLOCATION ──────────────────────────────────────── */}
+      {(selW.sp || 0) > 0 && (
+        <Section label={`STAT ALLOCATION — ${selW.sp} SP AVAILABLE`}>
+          <Card elevated style={{ margin:'0 16px', padding:'12px' }}>
+            <div style={{ color:'#2a2a48', fontFamily:'JetBrains Mono,monospace', fontSize:9, marginBottom:8, letterSpacing:1 }}>
+              SPEND 1 SP → +3 TO ANY STAT (max 99)
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+              {Object.entries(selW.stats).map(([s, v]) => (
+                <div key={s} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', background:'#0a0a18', borderRadius:8, border:'1px solid #181830' }}>
+                  <div>
+                    <div style={{ color:'#2a2a48', fontSize:8, letterSpacing:2, textTransform:'uppercase', marginBottom:1 }}>{s}</div>
+                    <div style={{ color:GOLD, fontSize:18, fontWeight:700, fontFamily:'JetBrains Mono,monospace', lineHeight:1 }}>{Math.round(v)}</div>
+                  </div>
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      if ((selW.sp || 0) < 1 || v >= 99) return;
+                      const newStats = { ...selW.stats, [s]: Math.min(99, v + 3) };
+                      setWrestlers(prev => prev.map(wr => wr.id === selW.id ? { ...wr, sp: wr.sp - 1, stats: newStats } : wr));
+                      setSelW(prev => ({ ...prev, sp: prev.sp - 1, stats: newStats }));
+                    }}
+                    style={{ background: v < 99 ? GOLD : '#1a1a30', color: v < 99 ? '#0a0a0f' : '#222',
+                             border:'none', borderRadius:6, width:30, height:30,
+                             fontFamily:'JetBrains Mono,monospace', fontSize:16, fontWeight:700,
+                             cursor: v < 99 ? 'pointer' : 'not-allowed', flexShrink:0,
+                             display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    +
+                  </button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </Section>
+      )}
+
+      {/* ── PERKS ────────────────────────────────────────────────── */}
+      <Section label="PERKS · SKILL UPGRADES">
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, margin:'0 16px' }}>
+          {PERKS.map(perk => {
+            const owned    = (selW.perks || []).includes(perk.id);
+            const canMeet  = perkMet(perk, selW);
+            const canBuy   = canMeet && !owned && (selW.sp || 0) >= perk.cost;
+            const color    = owned ? GOLD : canMeet ? '#6688cc' : '#2a2a40';
+            const reqText  = Object.entries(perk.req).map(([k, v]) => k === 'age' ? `age ≥ ${v}` : k === 'age_max' ? `age ≤ ${v}` : k === 'growthRate' ? `talent ≥ ${v}` : `${k} ≥ ${v}`).join(' · ');
+            return (
+              <div key={perk.id}
+                onClick={e => {
+                  e.stopPropagation();
+                  if (!canBuy) return;
+                  const newPerks = [...(selW.perks || []), perk.id];
+                  setWrestlers(prev => prev.map(wr => wr.id === selW.id ? { ...wr, sp: wr.sp - perk.cost, perks: newPerks } : wr));
+                  setSelW(prev => ({ ...prev, sp: prev.sp - perk.cost, perks: newPerks }));
+                }}
+                style={{ padding:'10px', background: owned ? 'rgba(201,168,76,0.07)' : '#0d0d1c',
+                         borderRadius:10, border:`1px solid ${owned ? 'rgba(201,168,76,0.4)' : canMeet ? 'rgba(100,130,210,0.25)' : '#181830'}`,
+                         cursor: canBuy ? 'pointer' : 'default', opacity: !canMeet && !owned ? 0.4 : 1,
+                         boxShadow: canBuy ? '0 0 8px rgba(100,130,210,0.12)' : 'none' }}>
+                <div style={{ fontSize:20, marginBottom:4 }}>{perk.icon}</div>
+                <div style={{ color, fontSize:12, fontFamily:'Noto Serif JP,serif', fontWeight:700, marginBottom:3 }}>{perk.name}</div>
+                <div style={{ color:'#2a2a48', fontSize:9, fontFamily:'JetBrains Mono,monospace', marginBottom:6, lineHeight:1.3 }}>{perk.desc}</div>
+                {owned
+                  ? <div style={{ color:GOLD, fontSize:8, fontFamily:'JetBrains Mono,monospace', fontWeight:700 }}>✓ ACTIVE</div>
+                  : canMeet
+                    ? <div style={{ color:'#4466aa', fontSize:8, fontFamily:'JetBrains Mono,monospace' }}>
+                        {(selW.sp || 0) >= perk.cost ? `TAP · ${perk.cost} SP` : `NEED ${perk.cost} SP`}
+                      </div>
+                    : <div style={{ color:'#252545', fontSize:8, fontFamily:'JetBrains Mono,monospace' }}>{reqText}</div>
+                }
+              </div>
+            );
+          })}
+        </div>
+      </Section>
     </div>
   ) : (
     // Roster list
@@ -1867,34 +2033,57 @@ export default function App() {
       </div>
       {wrestlers.map(w => {
         const eff = Math.round(calcEffective(w));
+        const hasSP = (w.sp || 0) > 0;
         return (
-          <div key={w.id} onClick={() => setSelW(w)} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px', marginBottom:8, background:'#0d0d1c', borderRadius:12, border:`1px solid ${w.injured?'#2a1010':'#181830'}`, cursor:'pointer' }}>
-            <div style={{ width:42, height:42, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:w.injured?'#1a0808':'#12122a', border:`2px solid ${w.injured?RED:'#26266a'}`, flexShrink:0, position:'relative' }}>
-              <span style={{ color:w.injured?RED:GOLD, fontSize:14, fontWeight:700, fontFamily:'JetBrains Mono,monospace' }}>{eff}</span>
-              {/* Personality color ring arc — top-right corner */}
-              <div style={{ position:'absolute', top:-2, right:-2, width:10, height:10, borderRadius:'50%', background: PERSONALITY_COLORS[w.personality] || '#555', border:'1.5px solid #0d0d1c' }} />
-            </div>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ color:w.injured?'#7a3030':'#d8d8f0', fontSize:14, fontFamily:'Noto Serif JP,serif', fontWeight:700, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{w.name}</div>
-              <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:2 }}>
-                <RankBadge rank={w.rank} size={14} />
-                <span style={{ color:'#444', fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>{w.rank}</span>
-              </div>
-              {/* Win/loss ratio bar */}
-              {(w.record.wins + w.record.losses) > 0 && (
-                <div style={{ display:'flex', height:2, borderRadius:1, overflow:'hidden', marginTop:4, width:'100%' }}>
-                  <div style={{ width:`${(w.record.wins / (w.record.wins + w.record.losses)) * 100}%`, background:'#2a5a2a' }} />
-                  <div style={{ flex:1, background:'#4a1a1a' }} />
-                </div>
-              )}
-            </div>
-            {w.injured && <div style={{ color:RED, fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>INJ</div>}
-            {!w.injured && (w.streak || 0) !== 0 && (
-              <div style={{ fontFamily:'JetBrains Mono,monospace', fontSize:10, fontWeight:700, color: (w.streak||0) > 0 ? GREEN : RED, minWidth:22, textAlign:'right' }}>
-                {(w.streak||0) > 0 ? `▲${w.streak}` : `▼${Math.abs(w.streak)}`}
+          <div key={w.id} onClick={() => setSelW(w)}
+            style={{ display:'flex', gap:10, padding:'10px 12px', marginBottom:8, background:'#0d0d1c',
+                     borderRadius:12, border:`1px solid ${hasSP ? 'rgba(201,168,76,0.35)' : w.injured ? '#2a1010' : '#181830'}`,
+                     cursor:'pointer', position:'relative', boxShadow: hasSP ? '0 0 10px rgba(201,168,76,0.07)' : 'none' }}>
+            {/* SP badge */}
+            {hasSP && (
+              <div style={{ position:'absolute', top:8, right:38, background:GOLD, color:'#0a0a0f', borderRadius:8,
+                            fontSize:8, fontWeight:700, fontFamily:'JetBrains Mono,monospace', padding:'1px 5px', lineHeight:1.5 }}>
+                {w.sp} SP
               </div>
             )}
-            <div style={{ color:'#282848', fontSize:18 }}>›</div>
+            {/* Portrait */}
+            <WrestlerPortrait wrestler={w} side="left" style={{ width:44, height:54 }} />
+            {/* Info block */}
+            <div style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
+              <div>
+                <div style={{ color:w.injured?'#7a3030':'#d8d8f0', fontSize:14, fontFamily:'Noto Serif JP,serif', fontWeight:700, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', marginBottom:1 }}>{w.name}</div>
+                <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:4 }}>
+                  <RankBadge rank={w.rank} size={12} />
+                  <span style={{ color:'#333', fontSize:9, fontFamily:'JetBrains Mono,monospace' }}>{w.rank}</span>
+                  <span style={{ color: PERSONALITY_COLORS[w.personality]||'#555', fontSize:8, fontFamily:'JetBrains Mono,monospace', marginLeft:2 }}>· {w.personality}</span>
+                </div>
+              </div>
+              {/* 3 stat mini-bars */}
+              <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                {['power','technique','speed'].map(s => (
+                  <div key={s} style={{ display:'flex', alignItems:'center', gap:4 }}>
+                    <span style={{ color:'#252545', fontSize:7, fontFamily:'JetBrains Mono,monospace', width:18, textAlign:'right', textTransform:'uppercase' }}>{s.slice(0,3)}</span>
+                    <div style={{ flex:1, height:3, background:'#12122a', borderRadius:2, overflow:'hidden' }}>
+                      <div style={{ height:'100%', width:`${w.stats[s]}%`, background:'linear-gradient(90deg,#2a2a5a,#c9a84c)', borderRadius:2 }} />
+                    </div>
+                    <span style={{ color:'#333', fontSize:7, fontFamily:'JetBrains Mono,monospace', width:16, textAlign:'right' }}>{Math.round(w.stats[s])}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Bottom row: condition dots + streak + W-L */}
+              <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:4 }}>
+                <div style={{ width:7, height:7, borderRadius:'50%', background: w.condition.morale < 40 ? RED : w.condition.morale > 70 ? GREEN : ORANGE, flexShrink:0 }} />
+                <div style={{ width:7, height:7, borderRadius:'50%', background: w.condition.fatigue > 70 ? RED : w.condition.fatigue > 40 ? ORANGE : GREEN, flexShrink:0 }} />
+                {w.injured && <span style={{ color:RED, fontSize:8, fontFamily:'JetBrains Mono,monospace' }}>INJ</span>}
+                {!w.injured && (w.streak||0) !== 0 && (
+                  <span style={{ fontSize:8, fontFamily:'JetBrains Mono,monospace', fontWeight:700, color:(w.streak||0)>0?GREEN:RED }}>
+                    {(w.streak||0)>0?`▲${w.streak}`:`▼${Math.abs(w.streak)}`}
+                  </span>
+                )}
+                <span style={{ marginLeft:'auto', color:'#2a2a48', fontSize:8, fontFamily:'JetBrains Mono,monospace' }}>{w.record.wins}W {w.record.losses}L</span>
+              </div>
+            </div>
+            <div style={{ color:'#282848', fontSize:18, alignSelf:'center' }}>›</div>
           </div>
         );
       })}
