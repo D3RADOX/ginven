@@ -17,11 +17,11 @@ const KIMARITE_LIST = [
 const RANKS = ['Yokozuna','Ozeki','Sekiwake','Komusubi','Maegashira 1','Maegashira 3','Maegashira 5','Maegashira 8','Maegashira 10','Juryo 1','Juryo 5','Juryo 12','Makushita 1'];
 
 const TRAINING_POLICIES = [
-  { id: 'power',     name: 'Power Focus',    fatigue: 8,  morale: -3, growth: { power: 0.9, stamina: 0.3 },               injuryRisk: false, desc: 'Builds raw strength. High fatigue cost.' },
-  { id: 'technique', name: 'Technique Focus', fatigue: 5,  morale: 1,  growth: { technique: 0.9, balance: 0.3 },           injuryRisk: false, desc: 'Develops kimarite precision. Morale-positive.' },
-  { id: 'balanced',  name: 'Balanced',        fatigue: 4,  morale: 0,  growth: { power:0.3, technique:0.3, speed:0.2, balance:0.2 }, injuryRisk: false, desc: 'Steady all-round development.' },
-  { id: 'light',     name: 'Light Recovery',  fatigue: -10,morale: 5,  growth: {},                                          injuryRisk: false, desc: 'Rest and recovery. No stat growth.' },
-  { id: 'intensive', name: 'Intensive',        fatigue: 14, morale: -6, growth: { power:0.6, technique:0.5, stamina:0.5 },  injuryRisk: true,  desc: 'Maximum gains. High injury risk.' },
+  { id: 'power',     name: 'Teppō Drills',     fatigue: 8,  morale: -3, growth: { power: 0.9, stamina: 0.3 },               injuryRisk: false, desc: 'Iron post striking — builds raw power and body hardness.' },
+  { id: 'technique', name: 'Shiko Practice',   fatigue: 5,  morale: 1,  growth: { technique: 0.9, balance: 0.3 },           injuryRisk: false, desc: 'Leg-stomp rituals — develops kimarite and balance.' },
+  { id: 'balanced',  name: 'Mōsōgeiko',        fatigue: 4,  morale: 0,  growth: { power:0.3, technique:0.3, speed:0.2, balance:0.2 }, injuryRisk: false, desc: 'Imaginary bout training — steady all-round growth.' },
+  { id: 'light',     name: 'Butsukari-geiko',  fatigue: -10,morale: 5,  growth: {},                                          injuryRisk: false, desc: 'Light pushing drill — rest and recovery, no stat gains.' },
+  { id: 'intensive', name: 'Sanbangeiko',       fatigue: 14, morale: -6, growth: { power:0.6, technique:0.5, stamina:0.5 },  injuryRisk: true,  desc: 'Repetitive bout sparring — maximum gains, high injury risk.' },
 ];
 
 const DISCIPLINE_LEVELS = [
@@ -50,6 +50,7 @@ function makeWrestler(id, name, rank, age, stats, personality, kimarite) {
     kimarite: kimarite || rnd(KIMARITE_LIST),
     record: { wins: ri(0, 25), losses: ri(0, 20) },
     injured: false, injuryDays: 0,
+    streak: 0,
     hidden: { growthRate: 0.4 + Math.random() * 0.8, injuryProne: Math.random() < 0.2, peakAge: ri(26, 32) },
   };
 }
@@ -78,6 +79,14 @@ const STOCK_OPPONENTS = [
   { id:205, name:'Yoshida Taiga',  rank:'Juryo 9',       stats:{power:62,technique:71,speed:78,balance:73,stamina:60,mental:80}, condition:{morale:78,fatigue:18,discipline:65}, kimarite:'Tsukiotoshi', personality:'Silent Grinder' },
 ];
 
+const OPPONENT_NAMES = [
+  'Suzuki Yūta', 'Kobayashi Ryū', 'Katō Masaru', 'Itō Hiroki', 'Watanabe Daisuke',
+  'Tanaka Shinji', 'Yamada Takuya', 'Inoue Haruki', 'Kimura Satoshi', 'Hasegawa Nori',
+  'Hayashi Minoru', 'Matsumoto Ken', 'Fujii Akihiro', 'Nishimura Tarō', 'Mori Genshiro',
+  'Aoki Kazuki', 'Yoshida Bungō', 'Ikeda Ryūnosuke', 'Ogata Makoto', 'Shimizu Tetsuya',
+  'Miura Isamu', 'Otsuka Hiroaki', 'Kaneko Naoki', 'Saito Yūki', 'Endo Shōhei',
+];
+
 // ─────────────────────────────────────────────────────────────────
 //  BOUT ENGINE
 // ─────────────────────────────────────────────────────────────────
@@ -89,10 +98,11 @@ function calcEffective(w) {
 }
 
 const NARRATIVES = {
-  shikiri:    ["The gyōji raises his fan. The dohyō falls silent.", "Both wrestlers glare across the shikiri line. The crowd holds its breath.", "Ritual salt scatters across the clay. Time slows."],
+  shikiri:    ["The gyōji raises his fan. The dohyō falls silent.", "Both rikishi glare across the shikiri line. The crowd holds its breath.", "Ritual salt scatters across the clay. Time slows."],
   tai_even:   ["An even collision — neither gains the opening!", "Perfectly matched tachiai. This will be decided in the grip.", "Simultaneous explosion — the impact echoes through the hall."],
   tai_adv:    ["surges forward with a thunderous tachiai, seizing the initiative!", "blasts off the line first — instant advantage!", "catches the opponent completely off-balance at the charge!"],
-  grip_even:  ["Both wrestlers battle fiercely for mawashi control.", "A tense grip battle — sweat-slicked hands, shuffling feet.", "Neither can establish the dominant hold."],
+  tai_henka:  ["sidesteps sharply at the tachiai — the crowd murmurs!", "pulls a lightning 変化 — the opponent crashes through empty air!", "dives to the side at the charge — audacious!"],
+  grip_even:  ["Both rikishi battle fiercely for mawashi control.", "A tense grip battle — sweat-slicked hands, shuffling feet.", "Neither can establish the dominant hold."],
   grip_adv:   ["locks in a devastating double-inside grip — total control!", "secures the outside belt with an iron fist!", "wraps up both arms — the crowd gasps at the technique!"],
   push_adv:   ["drives with tremendous force toward the tawara!", "grinds forward step by relentless step!", "the weight advantage is overwhelming — ground is being given!"],
   retreat:    ["scrambles desperately at the bales — toes on the edge!", "pivots in a last-ditch attempt to escape!", "the sand is crumbling underfoot at the ring's rim!"],
@@ -100,28 +110,59 @@ const NARRATIVES = {
   loss_sfx:   ["steps out — it's over!", "touches the sand first!", "cannot hold the edge!"],
 };
 
-function generateBout(w1, w2) {
+function generateOpponent(rank) {
+  const rankIdx = RANKS.indexOf(rank);
+  const tierBase = Math.max(48, 88 - rankIdx * 3);
+  const statVal = () => clamp(tierBase - 8 + ri(0, 16), 40, 95);
+  const oppRankIdx = clamp(rankIdx + ri(-1, 1), 0, RANKS.length - 1);
+  return {
+    id: Date.now() + Math.random(),
+    name: rnd(OPPONENT_NAMES),
+    rank: RANKS[oppRankIdx],
+    stats: { power: statVal(), technique: statVal(), speed: statVal(), balance: statVal(), stamina: statVal(), mental: statVal() },
+    condition: { morale: ri(60, 85), fatigue: ri(15, 35), discipline: ri(55, 80) },
+    kimarite: rnd(KIMARITE_LIST),
+    personality: rnd(PERSONALITIES),
+  };
+}
+
+function generateBout(w1, w2, tactic = 'balanced') {
   const e1 = calcEffective(w1), e2 = calcEffective(w2);
   const phases = [];
   let momentum = 0;
+
+  // Tactic modifiers
+  const TACTIC_MODS = {
+    oshi:     { tachiai: 1.30, grip: 0.75, henkaSwing: 0 },
+    yotsu:    { tachiai: 0.85, grip: 1.30, henkaSwing: 0 },
+    henka:    { tachiai: 1.00, grip: 1.00, henkaSwing: (Math.random() < 0.52 ? 1 : -1) * (14 + Math.random() * 12) },
+    balanced: { tachiai: 1.00, grip: 1.00, henkaSwing: 0 },
+  };
+  const mods = TACTIC_MODS[tactic] || TACTIC_MODS.balanced;
+  const isHenka = tactic === 'henka';
 
   // Phase 0 — Shikiri (always even, visual setup)
   phases.push({ name: 'Shikiri', pose1: 'squat', pose2: 'squat', adv: 'even', x1: 0.25, x2: 0.75, text: rnd(NARRATIVES.shikiri) });
 
   // Phase 1 — Tachiai
-  const t = (Math.random() * e1) - (Math.random() * e2);
+  const tachiai_e1 = e1 * (1 + w1.stats.speed / 200) * mods.tachiai;
+  const t = (Math.random() * tachiai_e1) - (Math.random() * e2) + mods.henkaSwing;
   const tAdv = t > 5 ? 'w1' : t < -5 ? 'w2' : 'even';
   momentum += t * 0.38;
+  const taiText = isHenka
+    ? `${w1.name} ${rnd(NARRATIVES.tai_henka)}`
+    : (tAdv === 'even' ? rnd(NARRATIVES.tai_even) : `${tAdv==='w1'?w1.name:w2.name} ${rnd(NARRATIVES.tai_adv)}`);
   phases.push({
     name: 'Tachiai', adv: tAdv,
     pose1: tAdv === 'w2' ? 'retreat' : 'charge',
     pose2: tAdv === 'w1' ? 'retreat' : 'charge',
     x1: tAdv === 'w1' ? 0.38 : 0.30, x2: tAdv === 'w2' ? 0.62 : 0.70,
-    text: tAdv === 'even' ? rnd(NARRATIVES.tai_even) : `${tAdv==='w1'?w1.name:w2.name} ${rnd(NARRATIVES.tai_adv)}`,
+    text: taiText,
   });
 
   // Phase 2 — Grip Battle
-  const g = (Math.random() * e1 * (1 + w1.stats.technique / 180)) - (Math.random() * e2 * (1 + w2.stats.technique / 180));
+  const grip_e1 = e1 * (1 + w1.stats.technique / 180) * mods.grip;
+  const g = (Math.random() * grip_e1) - (Math.random() * e2 * (1 + w2.stats.technique / 180));
   const gAdv = g > 6 ? 'w1' : g < -6 ? 'w2' : 'even';
   momentum += g * 0.28;
   phases.push({
@@ -658,7 +699,7 @@ function BoutCanvas({ phases, currentPhase, names }) {
 // ─────────────────────────────────────────────────────────────────
 //  FIGHT VIEWER
 // ─────────────────────────────────────────────────────────────────
-function FightViewer({ bout, onClose }) {
+function FightViewer({ bout, onClose, kachiKoshi }) {
   const [phase, setPhase] = useState(0);
   const timerRef = useRef(null);
   const cur = bout.phases[phase];
@@ -724,6 +765,14 @@ function FightViewer({ bout, onClose }) {
       <div style={{ maxWidth:370, width:'92%', background:'#0c0b18', border:'1px solid #1a1836', borderRadius:12, padding:'14px 18px', marginBottom:14, minHeight:64, display:'flex', alignItems:'center', justifyContent:'center' }}>
         <p style={{ color:'#c8c4d8', fontFamily:'Noto Serif JP,serif', fontSize:14, lineHeight:1.6, margin:0, textAlign:'center' }}>{cur.text}</p>
       </div>
+
+      {/* Kachi-koshi overlay */}
+      {isLast && kachiKoshi && cur.winner === 'w1' && (
+        <div style={{ maxWidth:370, width:'92%', background:'linear-gradient(135deg,#0c1a08,#0a1408)', border:'1px solid rgba(68,204,102,0.5)', borderRadius:12, padding:'14px', marginBottom:10, textAlign:'center', boxShadow:'0 0 24px rgba(68,204,102,0.15)' }}>
+          <div style={{ color:GREEN, fontSize:22, fontFamily:'Noto Serif JP,serif', fontWeight:700, letterSpacing:2 }}>勝ち越し</div>
+          <div style={{ color:'#2a5a2a', fontFamily:'JetBrains Mono,monospace', fontSize:10, letterSpacing:4 }}>KACHI-KOSHI · MAJORITY WINS</div>
+        </div>
+      )}
 
       {/* Finish highlight card */}
       {isLast && (
@@ -899,6 +948,8 @@ export default function App() {
     { id:1, type:'info',    text:'Welcome to Thunder Gate Stable. The January Basho begins soon.' },
     { id:2, type:'warning', text:'Ogawa Hiroshi shows signs of fatigue — consider Light Recovery.' },
   ]);
+  const [wrestlerPolicies, setWrestlerPolicies] = useState({}); // { [wrestlerId]: policyId }
+  const [bashoResults, setBashoResults] = useState(null);
   const [selW, setSelW]         = useState(null);
   const [viewer, setViewer]     = useState(null);
   const [basho, setBasho]       = useState(null);
@@ -941,7 +992,6 @@ export default function App() {
       return { ...prev, time, day, month, year, funds };
     });
 
-    const pol = TRAINING_POLICIES.find(p => p.id === policy);
     const dis = DISCIPLINE_LEVELS.find(d => d.id === discipline);
 
     setWrestlers(prev => prev.map(w => {
@@ -949,6 +999,9 @@ export default function App() {
         const newInjuryDays = Math.max(0, w.injuryDays - 1);
         return { ...w, injuryDays: newInjuryDays, injured: newInjuryDays > 0 };
       }
+
+      // Use per-wrestler policy if assigned, else fall back to stable default
+      const pol = TRAINING_POLICIES.find(p => p.id === (wrestlerPolicies[w.id] || policy));
 
       let fat  = w.condition.fatigue   + pol.fatigue   * 0.32;
       let mor  = w.condition.morale    + pol.morale    * 0.32 + dis.moraleEff * 0.28;
@@ -1014,46 +1067,121 @@ export default function App() {
   // ── BASHO ────────────────────────────────────────────────────
   const startBasho = () => {
     const active = wrestlers.filter(w => !w.injured).slice(0, 4);
-    const bouts  = active.map((w, i) => ({ id:i+1, w, opp: STOCK_OPPONENTS[i % STOCK_OPPONENTS.length], result:null, boutData:null }));
-    const BASHO_MONTHS = [1, 3, 5, 7, 9, 11];
-    const BASHO_NAMES  = ['January', 'March', 'May', 'July', 'September', 'November'];
+    const BASHO_NAMES = ['January', 'March', 'May', 'July', 'September', 'November'];
     const bashoIdx  = BASHO_MONTHS.indexOf(stable.month);
     const bashoName = bashoIdx !== -1 ? `${BASHO_NAMES[bashoIdx]} Basho` : 'Grand Tournament';
-    setBasho({ name: bashoName, day:1, bouts });
+    const schedule = {};
+    active.forEach(w => {
+      schedule[w.id] = Array.from({ length: 15 }, (_, i) => ({
+        day: i + 1,
+        opp: generateOpponent(w.rank),
+        tactic: null,
+        result: null,
+        boutData: null,
+      }));
+    });
+    setBasho({ name: bashoName, currentDay: 1, schedule, enteredWrestlers: active });
+    setBashoResults(null);
   };
 
-  const resolveBout = (id) => {
-    setBasho(prev => ({
-      ...prev,
-      bouts: prev.bouts.map(b => {
-        if (b.id !== id) return b;
-        const bd = generateBout(b.w, b.opp);
-        return { ...b, result: bd.winner === 'w1' ? 'win' : 'loss', boutData: bd };
-      }),
-    }));
+  // Set tactic for a wrestler's current day bout
+  const setTactic = (wId, tactic) => {
+    setBasho(prev => {
+      const dayIdx = prev.currentDay - 1;
+      const newSched = { ...prev.schedule };
+      newSched[wId] = prev.schedule[wId].map((e, i) => i === dayIdx ? { ...e, tactic } : e);
+      return { ...prev, schedule: newSched };
+    });
   };
 
-  const openViewer = (bout) => {
-    let bd = bout.boutData;
+  // Watch a day's bout (opens FightViewer, generates bout if needed)
+  const watchDayBout = (w, entry) => {
+    const tactic = entry.tactic || 'balanced';
+    let bd = entry.boutData;
+    let updatedBasho = null;
     if (!bd) {
-      bd = generateBout(bout.w, bout.opp);
-      setBasho(prev => ({ ...prev, bouts: prev.bouts.map(b => b.id===bout.id ? {...b, result:bd.winner==='w1'?'win':'loss', boutData:bd} : b) }));
+      bd = generateBout(w, entry.opp, tactic);
+      setBasho(prev => {
+        const dayIdx = prev.currentDay - 1;
+        const newSched = { ...prev.schedule };
+        newSched[w.id] = prev.schedule[w.id].map((e, i) =>
+          i === dayIdx ? { ...e, result: bd.winner === 'w1' ? 'win' : 'loss', boutData: bd } : e
+        );
+        updatedBasho = { ...prev, schedule: newSched };
+        return updatedBasho;
+      });
     }
-    setViewer({ w1:bout.w, w2:bout.opp, phases:bd.phases, winner:bd.winner, kimarite:bd.kimarite, e1:bd.e1, e2:bd.e2 });
+    // Calculate if this win would achieve kachi-koshi
+    const currentDays = basho?.schedule[w.id] || [];
+    const currentWins = currentDays.filter(d => d.result === 'win').length + (bd.winner === 'w1' && !entry.result ? 1 : 0);
+    const currentLosses = currentDays.filter(d => d.result === 'loss').length;
+    const kachiKoshi = bd.winner === 'w1' && currentWins > currentLosses && currentWins >= 8;
+    setViewer({ w1: w, w2: entry.opp, phases: bd.phases, winner: bd.winner, kimarite: bd.kimarite, e1: bd.e1, e2: bd.e2, kachiKoshi });
+  };
+
+  // Auto-resolve a day's bout (picks random tactic if none chosen)
+  const autoDayBout = (w, entry) => {
+    const tactic = entry.tactic || rnd(['oshi','yotsu','henka','balanced']);
+    const bd = generateBout(w, entry.opp, tactic);
+    setBasho(prev => {
+      const dayIdx = prev.currentDay - 1;
+      const newSched = { ...prev.schedule };
+      newSched[w.id] = prev.schedule[w.id].map((e, i) =>
+        i === dayIdx ? { ...e, tactic, result: bd.winner === 'w1' ? 'win' : 'loss', boutData: bd } : e
+      );
+      return { ...prev, schedule: newSched };
+    });
+  };
+
+  // Advance to the next basho day
+  const advanceDay = () => {
+    setBasho(prev => ({ ...prev, currentDay: prev.currentDay + 1 }));
   };
 
   const endBasho = () => {
     if (!basho) return;
-    const wins   = basho.bouts.filter(b => b.result === 'win').length;
-    const losses = basho.bouts.filter(b => b.result === 'loss').length;
-    pushEvent('info', `${basho.name} concluded: ${wins}W–${losses}L. Reputation ${wins > losses ? '+' : ''}${(wins - losses) * 3}.`);
-    setStable(prev => ({ ...prev, reputation: clamp(prev.reputation + (wins - losses) * 3, 0, 100) }));
-    // Update records
+    // Calculate per-wrestler results
+    const perWrestler = {};
+    basho.enteredWrestlers.forEach(w => {
+      const days = basho.schedule[w.id] || [];
+      const wins   = days.filter(d => d.result === 'win').length;
+      const losses = days.filter(d => d.result === 'loss').length;
+      const kachiKoshi = wins > losses;
+      const rankIdx = RANKS.indexOf(w.rank);
+      const newRankIdx = kachiKoshi
+        ? Math.max(0, rankIdx - 1)
+        : Math.min(RANKS.length - 1, rankIdx + 1);
+      perWrestler[w.id] = { wins, losses, kachiKoshi, oldRank: w.rank, newRank: RANKS[newRankIdx] };
+    });
+
+    // Update wrestler ranks, records, streaks
     setWrestlers(prev => prev.map(w => {
-      const bout = basho.bouts.find(b => b.w.id === w.id);
-      if (!bout || !bout.result) return w;
-      return { ...w, record: { wins: w.record.wins + (bout.result==='win'?1:0), losses: w.record.losses + (bout.result==='loss'?1:0) } };
+      const res = perWrestler[w.id];
+      if (!res) return w;
+      const newRecord = { wins: w.record.wins + res.wins, losses: w.record.losses + res.losses };
+      const newStreak = res.kachiKoshi
+        ? (w.streak < 0 ? 1 : w.streak + 1)
+        : (w.streak > 0 ? -1 : w.streak - 1);
+      return { ...w, rank: res.newRank, record: newRecord, streak: newStreak };
     }));
+
+    // Reputation change
+    const totalWins   = Object.values(perWrestler).reduce((s, r) => s + r.wins,   0);
+    const totalLosses = Object.values(perWrestler).reduce((s, r) => s + r.losses, 0);
+    setStable(prev => ({ ...prev, reputation: clamp(prev.reputation + (totalWins - totalLosses) * 2, 0, 100) }));
+
+    // Push events per wrestler
+    basho.enteredWrestlers.forEach(w => {
+      const res = perWrestler[w.id];
+      if (!res) return;
+      if (res.kachiKoshi) {
+        pushEvent('info', `勝ち越し — ${w.name} ${res.wins}W-${res.losses}L. Promoted to ${res.newRank}.`);
+      } else {
+        pushEvent('warning', `負け越し — ${w.name} ${res.wins}W-${res.losses}L. Demoted to ${res.newRank}.`);
+      }
+    });
+
+    setBashoResults({ name: basho.name, results: perWrestler, enteredWrestlers: basho.enteredWrestlers });
     setBasho(null);
   };
 
@@ -1079,14 +1207,14 @@ export default function App() {
       </div>
 
       {/* Avg condition */}
-      <Section label="STABLE CONDITION">
+      <Section label="HEYA STATUS (部屋の状態)">
         <Card elevated style={{ margin:'0 16px', padding:'14px' }}>
           {['morale','fatigue','discipline'].map(s => <CondBar key={s} stat={s} val={avgCond(s)} />)}
         </Card>
       </Section>
 
       {/* Inbox */}
-      <Section label={`INBOX (${events.length})`}>
+      <Section label={`JIMUSHO · INBOX (${events.length})`}>
         {events.length === 0 && <div style={{ color:'#2a2a44', fontFamily:'Noto Serif JP,serif', fontSize:13, fontStyle:'italic', padding:'12px 20px' }}>No recent events.</div>}
         {events.map(ev => (
           <div key={ev.id} style={{ margin:'0 16px 6px', padding:'10px 14px', background:'#0d0d1c', borderRadius:10, borderLeft:`3px solid ${ev.type==='error'?RED:ev.type==='warning'?ORANGE:'#2a3a7a'}` }}>
@@ -1151,7 +1279,7 @@ export default function App() {
   ) : (
     // Roster list
     <div style={{ padding:'12px 16px 88px' }}>
-      <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, marginBottom:10 }}>ROSTER ({wrestlers.length})</div>
+      <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, marginBottom:10 }}>RIKISHI (力士) — {wrestlers.length}</div>
       {wrestlers.map(w => {
         const eff = Math.round(calcEffective(w));
         return (
@@ -1176,6 +1304,11 @@ export default function App() {
               )}
             </div>
             {w.injured && <div style={{ color:RED, fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>INJ</div>}
+            {!w.injured && (w.streak || 0) !== 0 && (
+              <div style={{ fontFamily:'JetBrains Mono,monospace', fontSize:10, fontWeight:700, color: (w.streak||0) > 0 ? GREEN : RED, minWidth:22, textAlign:'right' }}>
+                {(w.streak||0) > 0 ? `▲${w.streak}` : `▼${Math.abs(w.streak)}`}
+              </div>
+            )}
             <div style={{ color:'#282848', fontSize:18 }}>›</div>
           </div>
         );
@@ -1186,14 +1319,16 @@ export default function App() {
   const pol = TRAINING_POLICIES.find(p => p.id === policy);
   const dis = DISCIPLINE_LEVELS.find(d => d.id === discipline);
 
+  const TACTIC_ABBREVS = { power:'TEPPŌ', technique:'SHIKO', balanced:'MŌSŌ', light:'BUTSU', intensive:'SANBAN' };
+
   const TrainScreen = (
     <div style={{ padding:'0 0 88px' }}>
-      <Section label="TRAINING POLICY">
+      <Section label="DEFAULT KEIKO STYLE (稽古)">
         {TRAINING_POLICIES.map(p => (
           <div key={p.id} onClick={() => setPolicy(p.id)} style={{ margin:'0 16px 6px', padding:'12px 14px', background: policy===p.id ? '#121228' : '#0d0d1c', borderRadius:12, border:`1px solid ${policy===p.id?GOLD:'#181830'}`, cursor:'pointer', boxShadow: policy===p.id ? '0 0 0 1px rgba(200,168,76,0.2), 0 4px 16px rgba(0,0,0,0.4)' : 'none' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
               <span style={{ color: policy===p.id ? GOLD : '#9898b8', fontSize:14, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{p.name}</span>
-              {policy===p.id && <span style={{ color:GOLD, fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>● ACTIVE</span>}
+              {policy===p.id && <span style={{ color:GOLD, fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>● STABLE DEFAULT</span>}
             </div>
             <div style={{ color:'#444', fontSize:11, fontFamily:'JetBrains Mono,monospace', marginBottom:6 }}>{p.desc}</div>
             <div style={{ display:'flex', gap:14, flexWrap:'wrap' }}>
@@ -1205,7 +1340,7 @@ export default function App() {
         ))}
       </Section>
 
-      <Section label="DISCIPLINE LEVEL">
+      <Section label="HEYA CULTURE (部屋の風土)">
         {DISCIPLINE_LEVELS.map(d => (
           <div key={d.id} onClick={() => setDisc(d.id)} style={{ margin:'0 16px 6px', padding:'12px 14px', background: discipline===d.id ? '#121228' : '#0d0d1c', borderRadius:12, border:`1px solid ${discipline===d.id?GOLD:'#181830'}`, cursor:'pointer' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
@@ -1221,19 +1356,62 @@ export default function App() {
         ))}
       </Section>
 
-      <Section label="WRESTLER STATUS">
-        {wrestlers.map(w => (
-          <div key={w.id} style={{ margin:'0 16px 5px', padding:'10px 14px', background:'#0d0d1c', borderRadius:10, border:'1px solid #181830', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            <div style={{ color: w.injured?'#6a3030':'#c0c0d8', fontSize:13, fontFamily:'Noto Serif JP,serif' }}>{w.name}</div>
-            {w.injured
-              ? <span style={{ color:RED, fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>INJURED</span>
-              : <div style={{ display:'flex', gap:10 }}>
-                  <span style={{ color: w.condition.fatigue>70 ? RED : '#444', fontSize:11, fontFamily:'JetBrains Mono,monospace' }}>F:{Math.round(w.condition.fatigue)}</span>
-                  <span style={{ color: w.condition.morale<40 ? RED : '#444', fontSize:11, fontFamily:'JetBrains Mono,monospace' }}>M:{Math.round(w.condition.morale)}</span>
+      <Section label="RIKISHI KEIKO ASSIGNMENT (力士稽古)">
+        <div style={{ margin:'0 16px 4px', padding:'6px 10px', background:'#0a0a18', borderRadius:8, border:'1px solid #181830' }}>
+          <span style={{ color:'#2e2e50', fontSize:9, fontFamily:'JetBrains Mono,monospace', letterSpacing:2 }}>ASSIGN INDIVIDUAL KEIKO · TAP TO OVERRIDE · ↺ = USING DEFAULT</span>
+        </div>
+        {wrestlers.map(w => {
+          const wPol = wrestlerPolicies[w.id] || null;
+          const activePol = wPol || policy;
+          return (
+            <div key={w.id} style={{ margin:'0 16px 8px', padding:'10px 12px', background:'#0d0d1c', borderRadius:10, border:`1px solid ${w.injured?'#2a1010':'#181830'}` }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <div style={{ width:6, height:6, borderRadius:'50%', background: PERSONALITY_COLORS[w.personality] || '#555', flexShrink:0 }} />
+                  <span style={{ color: w.injured ? '#6a3030' : '#c0c0d8', fontSize:13, fontFamily:'Noto Serif JP,serif' }}>{w.name}</span>
                 </div>
-            }
-          </div>
-        ))}
+                {w.injured
+                  ? <span style={{ color:RED, fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>INJURED</span>
+                  : <div style={{ display:'flex', gap:8 }}>
+                      <span style={{ color: w.condition.fatigue>70 ? RED : '#444', fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>F:{Math.round(w.condition.fatigue)}</span>
+                      <span style={{ color: w.condition.morale<40 ? RED : '#444', fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>M:{Math.round(w.condition.morale)}</span>
+                    </div>
+                }
+              </div>
+              {/* Policy picker row */}
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                {TRAINING_POLICIES.map(p => {
+                  const isActive = activePol === p.id;
+                  const isOverride = wPol === p.id;
+                  return (
+                    <button key={p.id} onClick={() => {
+                      if (wPol === p.id) {
+                        // Already overridden to this: clear override
+                        setWrestlerPolicies(prev => { const n = {...prev}; delete n[w.id]; return n; });
+                      } else {
+                        setWrestlerPolicies(prev => ({ ...prev, [w.id]: p.id }));
+                      }
+                    }} style={{
+                      background: isActive ? (isOverride ? '#18182a' : '#121218') : '#0a0a14',
+                      border: `1px solid ${isActive ? (isOverride ? GOLD : '#3a3a60') : '#181828'}`,
+                      borderRadius: 6, padding: '4px 7px',
+                      color: isActive ? (isOverride ? GOLD : '#6060a0') : '#2a2a40',
+                      fontFamily: 'JetBrains Mono,monospace', fontSize: 9, cursor: 'pointer',
+                      fontWeight: isActive ? 700 : 400,
+                    }}>
+                      {isActive && !isOverride ? '↺ ' : ''}{TACTIC_ABBREVS[p.id] || p.id.toUpperCase().slice(0,5)}
+                    </button>
+                  );
+                })}
+              </div>
+              {wPol && (
+                <div style={{ color:'#3a4a2a', fontFamily:'JetBrains Mono,monospace', fontSize:9, marginTop:4 }}>
+                  ↳ OVERRIDE: {TRAINING_POLICIES.find(p=>p.id===wPol)?.name}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </Section>
     </div>
   );
@@ -1278,80 +1456,223 @@ export default function App() {
     </div>
   );
 
-  const BashoScreen = !basho ? (
-    <div style={{ padding:'40px 16px 88px', textAlign:'center' }}>
-      <div style={{ color:GOLD, fontSize:26, fontFamily:'Noto Serif JP,serif', fontWeight:700, marginBottom:6 }}>January Basho</div>
-      <div style={{ color:'#333', fontFamily:'JetBrains Mono,monospace', fontSize:11, letterSpacing:2, marginBottom:8 }}>15 DAYS · RYŌGOKU KOKUGIKAN</div>
-      <div style={{ color:'#555', fontSize:13, fontFamily:'Noto Serif JP,serif', marginBottom:32, lineHeight:1.6 }}>Your top wrestlers compete across 15 days. Each bout can be watched in the fight viewer.</div>
-      <button onClick={startBasho} style={{ background:GOLD, color:'#0a0a0f', border:'none', borderRadius:12, padding:'14px 36px', fontFamily:'JetBrains Mono,monospace', fontSize:13, fontWeight:700, cursor:'pointer', letterSpacing:2 }}>BEGIN BASHO</button>
-    </div>
-  ) : (
-    <div style={{ padding:'12px 16px 88px' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:4 }}>
-        <div style={{ color:GOLD, fontSize:16, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{basho.name}</div>
-        <div style={{ color:'#333', fontFamily:'JetBrains Mono,monospace', fontSize:10, letterSpacing:2 }}>DAY {basho.day}</div>
-      </div>
-      <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, marginBottom:12 }}>TAP WATCH TO VIEW · TAP RESULT TO RESOLVE</div>
+  const TACTIC_OPTIONS = [
+    { id:'oshi',  label:'OSHI 押し', sub:'Power rush — aggressive charge', col:'#cc4422' },
+    { id:'yotsu', label:'YOTSU 四つ', sub:'Grapple — mawashi control', col:'#4488cc' },
+    { id:'henka', label:'HENKA 変化', sub:'Sidestep — high risk / reward', col:'#88cc44' },
+  ];
 
-      {/* W-L track */}
-      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14, padding:'8px 12px', background:'#0d0d1c', borderRadius:8, border:'1px solid #181830' }}>
-        <div style={{ display:'flex', gap:4 }}>
-          {basho.bouts.map(b => (
-            <div key={b.id} style={{ width:10, height:10, borderRadius:'50%', background: b.result==='win' ? GREEN : b.result==='loss' ? RED : '#282840', border:`1px solid ${b.result==='win'?'#2a5a2a':b.result==='loss'?'#5a1a1a':'#383858'}` }} />
-          ))}
-        </div>
-        <span style={{ color:GOLD, fontFamily:'JetBrains Mono,monospace', fontSize:11, fontWeight:700, marginLeft:4 }}>
-          {basho.bouts.filter(b=>b.result==='win').length}W–{basho.bouts.filter(b=>b.result==='loss').length}L
-        </span>
-        <span style={{ color:'#333', fontFamily:'JetBrains Mono,monospace', fontSize:9, marginLeft:'auto' }}>
-          {basho.bouts.filter(b=>!b.result).length} REMAINING
-        </span>
+  const BashoScreen = bashoResults ? (
+    // Post-basho results screen
+    <div style={{ padding:'24px 16px 88px' }}>
+      <div style={{ textAlign:'center', marginBottom:20 }}>
+        <div style={{ color:GOLD, fontSize:20, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{bashoResults.name}</div>
+        <div style={{ color:'#333', fontFamily:'JetBrains Mono,monospace', fontSize:10, letterSpacing:3 }}>BASHO COMPLETE · BANZUKE UPDATE</div>
       </div>
-
-      {basho.bouts.map(b => (
-        <Card key={b.id} elevated={!!b.result} selected={!b.result} style={{ marginBottom:10, overflow:'hidden' }}>
-          <div style={{ padding:'12px 14px' }}>
+      {bashoResults.enteredWrestlers.map(w => {
+        const res = bashoResults.results[w.id];
+        if (!res) return null;
+        return (
+          <Card key={w.id} elevated style={{ marginBottom:12, padding:'16px 14px' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
               <div>
-                <div style={{ color:GOLD, fontSize:14, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{b.w.name}</div>
-                <div style={{ color:'#333', fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>{b.w.rank}</div>
+                <div style={{ color:'#d8d8f0', fontSize:14, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{w.name}</div>
+                <div style={{ color:'#333', fontSize:10, fontFamily:'JetBrains Mono,monospace', marginTop:2 }}>
+                  {res.oldRank} → <span style={{ color: res.kachiKoshi ? GREEN : RED }}>{res.newRank}</span>
+                </div>
               </div>
-              <div style={{ color:'#2e2e50', fontFamily:'Noto Serif JP,serif', fontSize:12, alignSelf:'center' }}>vs</div>
               <div style={{ textAlign:'right' }}>
-                <div style={{ color:RED, fontSize:14, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{b.opp.name}</div>
-                <div style={{ color:'#333', fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>{b.opp.rank}</div>
+                <div style={{ color: res.kachiKoshi ? GREEN : RED, fontSize:22, fontWeight:700, fontFamily:'JetBrains Mono,monospace' }}>{res.wins}W–{res.losses}L</div>
               </div>
             </div>
-            <div style={{ display:'flex', gap:8 }}>
-              <button onClick={() => openViewer(b)} style={{ flex:1, background:'#12122a', border:'1px solid #26265a', borderRadius:8, padding:'9px 0', color:'#7878cc', fontFamily:'JetBrains Mono,monospace', fontSize:12, cursor:'pointer', fontWeight:700, letterSpacing:1 }}>
-                👁 WATCH
-              </button>
-              {!b.result
-                ? <button onClick={() => resolveBout(b.id)} style={{ flex:1, background:'#1a1218', border:'1px solid #3a2830', borderRadius:8, padding:'9px 0', color:'#8a6644', fontFamily:'JetBrains Mono,monospace', fontSize:12, cursor:'pointer', fontWeight:700, letterSpacing:1 }}>RESOLVE</button>
-                : <div style={{ flex:1, borderRadius:8, padding:'9px 0', textAlign:'center', background: b.result==='win'?'#0a1a0a':'#1a0a0a', border:`1px solid ${b.result==='win'?'#2a4a2a':'#4a2a2a'}`, color: b.result==='win'?GREEN:RED, fontFamily:'JetBrains Mono,monospace', fontSize:12, fontWeight:700, letterSpacing:2 }}>
-                    {b.result === 'win' ? '✓ WIN' : '✗ LOSS'}
-                  </div>
-              }
+            <div style={{
+              padding:'8px 14px', borderRadius:8, textAlign:'center',
+              background: res.kachiKoshi ? 'rgba(68,204,102,0.06)' : 'rgba(232,64,64,0.06)',
+              border: `1px solid ${res.kachiKoshi ? 'rgba(68,204,102,0.3)' : 'rgba(232,64,64,0.3)'}`,
+            }}>
+              <div style={{ color: res.kachiKoshi ? GREEN : RED, fontSize:16, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>
+                {res.kachiKoshi ? '勝ち越し KACHI-KOSHI' : '負け越し MAKE-KOSHI'}
+              </div>
+              <div style={{ color:'#444', fontSize:10, fontFamily:'JetBrains Mono,monospace', marginTop:2 }}>
+                {res.kachiKoshi ? 'MAJORITY WINS — PROMOTED' : 'MAJORITY LOSSES — DEMOTED'}
+              </div>
             </div>
-          </div>
-        </Card>
-      ))}
-
-      {basho.bouts.every(b => b.result) && (
-        <button onClick={endBasho} style={{ width:'100%', marginTop:8, background:GOLD, color:'#0a0a0f', border:'none', borderRadius:12, padding:'14px', fontFamily:'JetBrains Mono,monospace', fontSize:13, fontWeight:700, cursor:'pointer', letterSpacing:2 }}>
-          END BASHO
-        </button>
-      )}
+          </Card>
+        );
+      })}
+      <button onClick={() => setBashoResults(null)} style={{ width:'100%', marginTop:4, background:GOLD, color:'#0a0a0f', border:'none', borderRadius:12, padding:'14px', fontFamily:'JetBrains Mono,monospace', fontSize:13, fontWeight:700, cursor:'pointer', letterSpacing:2 }}>
+        RETURN TO HEYA
+      </button>
     </div>
+  ) : !basho ? (
+    // Pre-basho lobby
+    <div style={{ padding:'40px 16px 88px', textAlign:'center' }}>
+      <div style={{ color:GOLD, fontSize:28, fontFamily:'Noto Serif JP,serif', fontWeight:700, marginBottom:4 }}>
+        {(() => { const names = ['January','March','May','July','September','November']; const idx = BASHO_MONTHS.indexOf(stable.month); return idx !== -1 ? `${names[idx]} Basho` : 'Grand Tournament'; })()}
+      </div>
+      <div style={{ color:'#333', fontFamily:'JetBrains Mono,monospace', fontSize:11, letterSpacing:2, marginBottom:8 }}>15 DAYS · RYŌGOKU KOKUGIKAN</div>
+      <div style={{ color:'#555', fontSize:13, fontFamily:'Noto Serif JP,serif', marginBottom:12, lineHeight:1.6 }}>
+        Your rikishi compete one bout per day. Choose a tactical approach before each fight.
+      </div>
+      <div style={{ margin:'0 0 28px', padding:'12px', background:'#0d0d1c', borderRadius:10, border:'1px solid #1a1a36', textAlign:'left' }}>
+        <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, marginBottom:8 }}>ENTERING RIKISHI</div>
+        {wrestlers.filter(w => !w.injured).slice(0, 4).map(w => (
+          <div key={w.id} style={{ display:'flex', justifyContent:'space-between', padding:'4px 0', borderBottom:'1px solid #141428' }}>
+            <span style={{ color:'#c0c0d8', fontFamily:'Noto Serif JP,serif', fontSize:13 }}>{w.name}</span>
+            <span style={{ color:'#444', fontFamily:'JetBrains Mono,monospace', fontSize:10 }}>{w.rank}</span>
+          </div>
+        ))}
+      </div>
+      <button onClick={startBasho} style={{ background:GOLD, color:'#0a0a0f', border:'none', borderRadius:12, padding:'16px 42px', fontFamily:'JetBrains Mono,monospace', fontSize:14, fontWeight:700, cursor:'pointer', letterSpacing:3 }}>
+        ⛩ BEGIN BASHO
+      </button>
+    </div>
+  ) : (
+    // Active basho — day-by-day
+    (() => {
+      const todayBouts = basho.enteredWrestlers.map(w => ({
+        w,
+        entry: basho.schedule[w.id][basho.currentDay - 1],
+      }));
+      const allTodayDone = todayBouts.every(b => b.entry.result);
+      const isLastDay = basho.currentDay === 15;
+
+      return (
+        <div style={{ padding:'12px 16px 88px' }}>
+          {/* Header */}
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:4 }}>
+            <div style={{ color:GOLD, fontSize:16, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{basho.name}</div>
+            <div style={{ color:GOLD, fontFamily:'JetBrains Mono,monospace', fontSize:13, fontWeight:700, letterSpacing:1 }}>DAY {basho.currentDay} / 15</div>
+          </div>
+
+          {/* 15-day progress bar */}
+          <div style={{ display:'flex', gap:2, marginBottom:12 }}>
+            {Array.from({length:15},(_,i) => {
+              const day = basho.schedule[basho.enteredWrestlers[0]?.id]?.[i];
+              const isToday = i === basho.currentDay - 1;
+              const bg = day?.result === 'win' ? GREEN : day?.result === 'loss' ? RED : isToday ? GOLD : '#1a1a30';
+              return <div key={i} style={{ flex:1, height: isToday ? 6 : 4, borderRadius:2, background:bg, transition:'all 0.2s' }} />;
+            })}
+          </div>
+
+          {/* Per-wrestler W-L tracks */}
+          {basho.enteredWrestlers.map(w => {
+            const days = basho.schedule[w.id];
+            const wins = days.filter(d => d.result === 'win').length;
+            const losses = days.filter(d => d.result === 'loss').length;
+            const completed = days.filter(d => d.result).length;
+            const kachi = wins > 8 || (completed === 15 && wins > losses);
+            return (
+              <div key={w.id} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6, padding:'6px 10px', background:'#0d0d1c', borderRadius:8, border:'1px solid #181830' }}>
+                <span style={{ color:'#8888a8', fontFamily:'Noto Serif JP,serif', fontSize:11, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{w.name}</span>
+                <div style={{ display:'flex', gap:2 }}>
+                  {days.map((d,i) => (
+                    <div key={i} style={{ width:7, height:7, borderRadius:1,
+                      background: d.result==='win' ? GREEN : d.result==='loss' ? RED : i===basho.currentDay-1 ? 'rgba(201,168,76,0.4)' : '#1a1a30'
+                    }} />
+                  ))}
+                </div>
+                <span style={{ color: wins>losses?GREEN:losses>wins?RED:'#444', fontFamily:'JetBrains Mono,monospace', fontSize:11, fontWeight:700, minWidth:36, textAlign:'right' }}>
+                  {wins}W-{losses}L
+                </span>
+                {kachi && <span style={{ color:GREEN, fontSize:9, fontFamily:'JetBrains Mono,monospace' }}>勝</span>}
+              </div>
+            );
+          })}
+
+          {/* Today's bouts */}
+          <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, margin:'10px 0 8px' }}>
+            TODAY'S BOUTS — DAY {basho.currentDay}
+          </div>
+
+          {todayBouts.map(({ w, entry }) => (
+            <Card key={w.id} elevated={!!entry.result} selected={!entry.result} style={{ marginBottom:10, overflow:'hidden' }}>
+              <div style={{ padding:'12px 14px' }}>
+                {/* Matchup header */}
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+                  <div>
+                    <div style={{ color:GOLD, fontSize:14, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{w.name}</div>
+                    <div style={{ color:'#333', fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>{w.rank}</div>
+                  </div>
+                  <div style={{ color:'#2e2e50', fontFamily:'Noto Serif JP,serif', fontSize:12, alignSelf:'center', padding:'0 8px' }}>対</div>
+                  <div style={{ textAlign:'right' }}>
+                    <div style={{ color:RED, fontSize:14, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{entry.opp.name}</div>
+                    <div style={{ color:'#333', fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>{entry.opp.rank}</div>
+                  </div>
+                </div>
+
+                {/* Tactic selector (only if not yet resolved) */}
+                {!entry.result && (
+                  <>
+                    <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:2, marginBottom:6 }}>CHOOSE YOUR APPROACH</div>
+                    <div style={{ display:'flex', gap:5, marginBottom:10 }}>
+                      {TACTIC_OPTIONS.map(t => {
+                        const isChosen = entry.tactic === t.id;
+                        return (
+                          <button key={t.id} onClick={() => setTactic(w.id, t.id)} style={{
+                            flex:1, background: isChosen ? '#12122a' : '#0a0a14',
+                            border: `1px solid ${isChosen ? t.col : '#1a1a2e'}`,
+                            borderRadius:8, padding:'8px 4px', cursor:'pointer',
+                            boxShadow: isChosen ? `0 0 8px ${t.col}44` : 'none',
+                          }}>
+                            <div style={{ color: isChosen ? t.col : '#3a3a50', fontSize:10, fontFamily:'JetBrains Mono,monospace', fontWeight:700, letterSpacing:1 }}>{t.label}</div>
+                            <div style={{ color:'#2e2e40', fontSize:8, fontFamily:'JetBrains Mono,monospace', marginTop:2 }}>{t.sub}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {/* Action buttons */}
+                <div style={{ display:'flex', gap:8 }}>
+                  {!entry.result ? (
+                    <>
+                      <button onClick={() => watchDayBout(w, entry)} disabled={!entry.tactic} style={{ flex:2, background: entry.tactic ? '#12122a' : '#0a0a18', border:`1px solid ${entry.tactic?'#26265a':'#141428'}`, borderRadius:8, padding:'9px 0', color: entry.tactic ? '#7878cc' : '#2a2a40', fontFamily:'JetBrains Mono,monospace', fontSize:12, cursor: entry.tactic ? 'pointer' : 'not-allowed', fontWeight:700, letterSpacing:1 }}>
+                        WATCH
+                      </button>
+                      <button onClick={() => autoDayBout(w, entry)} style={{ flex:1, background:'#0d0d14', border:'1px solid #1a1a24', borderRadius:8, padding:'9px 0', color:'#3a3a54', fontFamily:'JetBrains Mono,monospace', fontSize:11, cursor:'pointer', letterSpacing:1 }}>
+                        AUTO
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => watchDayBout(w, entry)} style={{ flex:1, background:'#0d0d1c', border:'1px solid #1a1a30', borderRadius:8, padding:'9px 0', color:'#5050a0', fontFamily:'JetBrains Mono,monospace', fontSize:11, cursor:'pointer', letterSpacing:1 }}>REPLAY</button>
+                      <div style={{ flex:2, borderRadius:8, padding:'9px 0', textAlign:'center', background: entry.result==='win'?'#0a1a0a':'#1a0a0a', border:`1px solid ${entry.result==='win'?'#2a4a2a':'#4a2a2a'}`, color: entry.result==='win'?GREEN:RED, fontFamily:'JetBrains Mono,monospace', fontSize:13, fontWeight:700, letterSpacing:2 }}>
+                        {entry.result === 'win' ? '✓ WIN' : '✗ LOSS'}
+                        {entry.boutData?.kimarite && <span style={{ color:'#2a3a2a', fontSize:9, display:'block', letterSpacing:1 }}>{entry.boutData.kimarite}</span>}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </Card>
+          ))}
+
+          {/* Navigation */}
+          {allTodayDone && (
+            isLastDay ? (
+              <button onClick={endBasho} style={{ width:'100%', marginTop:8, background:GOLD, color:'#0a0a0f', border:'none', borderRadius:12, padding:'14px', fontFamily:'JetBrains Mono,monospace', fontSize:13, fontWeight:700, cursor:'pointer', letterSpacing:2 }}>
+                END BASHO — SEE RESULTS
+              </button>
+            ) : (
+              <button onClick={advanceDay} style={{ width:'100%', marginTop:8, background:'#12122a', border:`1px solid ${GOLD}`, color:GOLD, borderRadius:12, padding:'14px', fontFamily:'JetBrains Mono,monospace', fontSize:13, fontWeight:700, cursor:'pointer', letterSpacing:2 }}>
+                DAY {basho.currentDay + 1} TOMOROW →
+              </button>
+            )
+          )}
+        </div>
+      );
+    })()
   );
 
   // ── TABS ─────────────────────────────────────────────────────
   const TABS = [
-    { id:'stable', label:'Stable',  icon:'⛩' },
-    { id:'roster', label:'Roster',  icon:'👥' },
-    { id:'train',  label:'Train',   icon:'⚡' },
-    { id:'scout',  label:'Scout',   icon:'🔭' },
-    { id:'basho',  label:'Basho',   icon:'🏆' },
+    { id:'stable', label:'HEYA',    icon:'⛩' },
+    { id:'roster', label:'RIKISHI', icon:'👥' },
+    { id:'train',  label:'KEIKO',   icon:'⚡' },
+    { id:'scout',  label:'SCOUT',   icon:'🔭' },
+    { id:'basho',  label:'BASHO',   icon:'🏆' },
   ];
 
   const SCREENS = { stable: StableScreen, roster: RosterScreen, train: TrainScreen, scout: ScoutScreen, basho: BashoScreen };
@@ -1378,7 +1699,7 @@ export default function App() {
               <div style={{ color:'#282848', fontSize:9, fontFamily:'JetBrains Mono,monospace', letterSpacing:1 }}>FUNDS</div>
             </div>
             <button onClick={advance} style={{ background:GOLD, color:'#0a0a0f', border:'none', borderRadius:8, padding:'8px 13px', fontFamily:'JetBrains Mono,monospace', fontSize:10, fontWeight:700, cursor:'pointer', letterSpacing:1, whiteSpace:'nowrap' }}>
-              ADVANCE ▶
+              稽古 ADVANCE ▶
             </button>
           </div>
         </div>
@@ -1398,7 +1719,7 @@ export default function App() {
       </div>
 
       {/* Fight Viewer modal */}
-      {viewer && <FightViewer bout={viewer} onClose={() => setViewer(null)} />}
+      {viewer && <FightViewer bout={viewer} onClose={() => setViewer(null)} kachiKoshi={viewer.kachiKoshi} />}
     </div>
     </>
   );
