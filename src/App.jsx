@@ -35,6 +35,28 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 const BASHO_MONTHS = [1, 3, 5, 7, 9, 11]; // Jan, Mar, May, Jul, Sep, Nov
 
 // ─────────────────────────────────────────────────────────────────
+//  LANGUAGE / TRANSLATIONS
+// ─────────────────────────────────────────────────────────────────
+const TRANSLATIONS = {
+  tab_stable:  { EN: 'STABLE',      JP: 'HEYA'    },
+  tab_roster:  { EN: 'ROSTER',      JP: 'RIKISHI' },
+  tab_train:   { EN: 'TRAIN',       JP: 'KEIKO'   },
+  tab_basho:   { EN: 'TOURNAMENT',  JP: 'BASHO'   },
+  kachi:       { EN: 'MAJORITY WINS',   JP: '勝ち越し' },
+  make:        { EN: 'MAJORITY LOSSES', JP: '負け越し' },
+  heya_status: { EN: 'STABLE STATUS',   JP: '部屋の状態' },
+  rikishi_lbl: { EN: 'WRESTLERS',       JP: '力士'  },
+  keiko_lbl:   { EN: 'TRAINING STYLE',  JP: '稽古スタイル' },
+  heya_cult:   { EN: 'STABLE CULTURE',  JP: '部屋の風土' },
+  assign_lbl:  { EN: 'TRAINING ASSIGNMENT', JP: '力士稽古' },
+  vs_divider:  { EN: 'VS',              JP: '対'   },
+  dohyo_lbl:   { EN: 'DOHYO · RING',    JP: '土俵' },
+  advance_btn: { EN: 'ADVANCE ▶',       JP: '稽古 ADVANCE ▶' },
+  scout_lbl:   { EN: 'SCOUT REPORT',    JP: 'スカウトレポート' },
+};
+const T = (key, lang) => TRANSLATIONS[key]?.[lang] ?? key;
+
+// ─────────────────────────────────────────────────────────────────
 //  HELPERS
 // ─────────────────────────────────────────────────────────────────
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -226,6 +248,23 @@ function generateBout(w1, w2, tactic = 'balanced') {
   });
 
   return { phases, winner, kimarite: kim, e1, e2 };
+}
+
+// HP timeline: array of [hp1, hp2] snapshots before + after each phase
+const HP_DMG = { 'Tachiai': 22, 'Grip Battle': 15, 'Push & Position': 18 };
+function computeHpTimeline(phases) {
+  let h = [100, 100];
+  return [[...h], ...phases.map(ph => {
+    if (ph.name === 'Finish') {
+      h[ph.winner === 'w1' ? 1 : 0] = 0;
+    } else {
+      const d = HP_DMG[ph.name] || 0;
+      if      (ph.adv === 'w1') h[1] = Math.max(0, h[1] - d);
+      else if (ph.adv === 'w2') h[0] = Math.max(0, h[0] - d);
+      else { h[0] = Math.max(0, h[0] - 3); h[1] = Math.max(0, h[1] - 3); }
+    }
+    return [...h];
+  })];
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -438,7 +477,7 @@ function segaWrestler(ctx, cx, groundY, side, pose, skin, belt,
 }
 
 function renderBoutFrame(ctx, W, H, phase, x1, x2, names, t = 1,
-                         wrestlers = null, prevPhase = null, shake = { x: 0, y: 0 }) {
+                         wrestlers = null, prevPhase = null, shake = { x: 0, y: 0 }, cheerActive = false) {
   const GY = H - 28;
   const pn = phase.name;
   const vis1 = wrestlerVisuals(wrestlers?.w1);
@@ -453,7 +492,9 @@ function renderBoutFrame(ctx, W, H, phase, x1, x2, names, t = 1,
   ctx.fillRect(0, 0, W, H);
 
   // Crowd silhouettes — 4 rows with occasional accent spectators
-  const crowdPalette = ['#1a0d30','#140924','#1c0c1c','#18101e'];
+  const crowdPalette = cheerActive
+    ? ['#3a1a5a', '#2a3a1a', '#3a1a1a', '#2a2a1a']
+    : ['#1a0d30', '#140924', '#1c0c1c', '#18101e'];
   for (let row = 0; row < 4; row++) {
     const ry = 6 + row * 18;
     const count = 18 + row * 4;
@@ -462,10 +503,10 @@ function renderBoutFrame(ctx, W, H, phase, x1, x2, names, t = 1,
       const hx = (i * (W / count)) + (row % 2) * (W / count / 2);
       const hw = 10 + (i % 3) * 3;
       const hh = 14 + (i % 4) * 3;
-      // 1-in-8 chance of accent spectator (standing out, waving)
-      const isAccent = seed % 8 === 0;
+      // Cheer triples the accent density; normal is 1-in-8
+      const isAccent = cheerActive ? seed % 3 === 0 : seed % 8 === 0;
       ctx.fillStyle = isAccent
-        ? (seed % 2 === 0 ? '#3a1a5a' : '#1a3a1a')
+        ? (seed % 2 === 0 ? (cheerActive ? '#7a3a9a' : '#3a1a5a') : (cheerActive ? '#3a7a3a' : '#1a3a1a'))
         : crowdPalette[(i + row) % 4];
       ctx.fillRect(hx + 1, ry + hh * 0.42, hw - 2, hh * 0.62);
       ctx.beginPath();
@@ -475,6 +516,15 @@ function renderBoutFrame(ctx, W, H, phase, x1, x2, names, t = 1,
       if (isAccent) {
         ctx.fillRect(hx + hw * 0.6, ry + hh * 0.05, hw * 0.18, hh * 0.38);
       }
+    }
+  }
+  // Cheer: golden confetti dots floating above crowd
+  if (cheerActive) {
+    for (let i = 0; i < 14; i++) {
+      ctx.fillStyle = `rgba(201,168,76,${0.12 + (i % 4) * 0.07})`;
+      ctx.beginPath();
+      ctx.arc((i * 31 + 17) % W, 4 + (i * 19 % 68), 1.5 + (i % 3), 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 
@@ -747,6 +797,106 @@ function renderBoutFrame(ctx, W, H, phase, x1, x2, names, t = 1,
   for (let y = 0; y < H; y += 2) ctx.fillRect(0, y, W, 1);
 }
 
+// ─────────────────────────────────────────────────────────────────
+//  FIGHTER INTRO SEQUENCE RENDERER
+// ─────────────────────────────────────────────────────────────────
+function renderIntroFrame(ctx, W, H, step, t, vis1, vis2, w1, w2) {
+  const GY = H - 28;
+  const ease = 1 - Math.pow(1 - Math.min(1, t), 3);
+
+  // Dark bg
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#02010a'); bg.addColorStop(1, '#080514');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  if (step === 0 || step === 1) {
+    const isW1 = step === 0;
+    const vis = isW1 ? vis1 : vis2;
+    const wrestler = isW1 ? w1 : w2;
+    const side = isW1 ? 'left' : 'right';
+    const accentHex = isW1 ? '#c9a84c' : '#e84040';
+
+    // Belt-color side glow
+    const glowX = isW1 ? 0 : W;
+    const glow = ctx.createRadialGradient(glowX, H * 0.6, 10, glowX, H * 0.6, W * 0.75);
+    glow.addColorStop(0, vis.belt + '30'); glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+
+    // Wrestler slides in from the edge
+    const rawSlide = isW1 ? (1 - ease) * -140 : (1 - ease) * 140;
+    const drawCX = isW1 ? W * 0.32 + rawSlide : W * 0.68 + rawSlide;
+    ctx.save();
+    ctx.translate(drawCX, 14);
+    ctx.scale(1.45, 1.45);
+    segaWrestler(ctx, 0, GY / 1.45, side, 'ready', vis.skin, vis.belt, 1.0, null, 1.0, false);
+    ctx.restore();
+
+    // Horizontal accent line
+    ctx.globalAlpha = ease * 0.7;
+    ctx.fillStyle = accentHex;
+    ctx.fillRect(W * 0.08, H * 0.73, W * 0.84, 1);
+    ctx.globalAlpha = 1;
+
+    // Name text
+    ctx.save();
+    ctx.globalAlpha = ease;
+    const nameSlide = isW1 ? (1 - ease) * -60 : (1 - ease) * 60;
+    const nameX = W * 0.5 + nameSlide;
+    ctx.font = 'bold 16px "Noto Serif JP", serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ece8d8';
+    ctx.fillText(wrestler.name, nameX, H * 0.72);
+    ctx.font = '9px "JetBrains Mono", monospace';
+    ctx.fillStyle = accentHex;
+    ctx.letterSpacing = '3px';
+    ctx.fillText(wrestler.rank.toUpperCase(), nameX, H * 0.80);
+    ctx.restore();
+
+  } else {
+    // VS screen — both wrestlers + VS text
+    ctx.save();
+    ctx.translate(W * 0.27, 14);
+    ctx.scale(1.1, 1.1);
+    segaWrestler(ctx, 0, GY / 1.1, 'left',  'ready', vis1.skin, vis1.belt, 1.0, null, 1.0, false);
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(W * 0.73, 14);
+    ctx.scale(1.1, 1.1);
+    segaWrestler(ctx, 0, GY / 1.1, 'right', 'ready', vis2.skin, vis2.belt, 1.0, null, 1.0, false);
+    ctx.restore();
+
+    // VS flash — pulse
+    const pulse = 0.08 + Math.abs(Math.sin(t * Math.PI * 5)) * 0.08;
+    ctx.fillStyle = `rgba(201,168,76,${pulse})`;
+    ctx.fillRect(0, 0, W, H);
+
+    // VS text
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, ease * 1.6);
+    ctx.font = 'bold 40px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#c9a84c';
+    ctx.shadowColor = '#c9a84c'; ctx.shadowBlur = 18 * ease;
+    ctx.fillText('VS', W / 2, H / 2 + 16);
+    ctx.shadowBlur = 0;
+
+    // Name strip at bottom
+    ctx.font = '9px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#c9a84c';
+    ctx.textAlign = 'left';
+    ctx.fillText(w1.name.toUpperCase().slice(0, 14), W * 0.06, H - 22);
+    ctx.fillStyle = '#e84040';
+    ctx.textAlign = 'right';
+    ctx.fillText(w2.name.toUpperCase().slice(0, 14), W * 0.94, H - 22);
+    ctx.restore();
+  }
+
+  // Scanlines
+  ctx.fillStyle = 'rgba(0,0,0,0.032)';
+  for (let y = 0; y < H; y += 2) ctx.fillRect(0, y, W, 1);
+}
+
 function WrestlerPortrait({ wrestler, side }) {
   const cvRef = useRef(null);
   const vis = wrestlerVisuals(wrestler);
@@ -780,7 +930,19 @@ function WrestlerPortrait({ wrestler, side }) {
   );
 }
 
-function BoutCanvas({ phases, currentPhase, names, wrestlers }) {
+function IntroCanvas({ w1, w2, step, t }) {
+  const cvRef = useRef(null);
+  const vis1 = wrestlerVisuals(w1);
+  const vis2 = wrestlerVisuals(w2);
+  useEffect(() => {
+    const cv = cvRef.current; if (!cv) return;
+    const ctx = cv.getContext('2d');
+    renderIntroFrame(ctx, cv.width, cv.height, step, t, vis1, vis2, w1, w2);
+  });
+  return <canvas ref={cvRef} width={430} height={272} style={{ width: '100%', display: 'block' }} />;
+}
+
+function BoutCanvas({ phases, currentPhase, names, wrestlers, cheerActiveRef }) {
   const cvRef       = useRef(null);
   const posRef      = useRef(null);
   const rafRef      = useRef(null);
@@ -818,7 +980,7 @@ function BoutCanvas({ phases, currentPhase, names, wrestlers }) {
         y: shakeMag > 0 ? (Math.random() - 0.5) * shakeMag * 0.35 : 0,
       };
 
-      renderBoutFrame(ctx, W, H, cur, x1, x2, names, e, wrestlers, prevPhase, shake);
+      renderBoutFrame(ctx, W, H, cur, x1, x2, names, e, wrestlers, prevPhase, shake, cheerActiveRef?.current ?? false);
       if (t < 1) rafRef.current = requestAnimationFrame(tick);
     };
 
@@ -838,31 +1000,185 @@ function BoutCanvas({ phases, currentPhase, names, wrestlers }) {
 }
 
 // ─────────────────────────────────────────────────────────────────
+//  SOUND SYSTEM
+// ─────────────────────────────────────────────────────────────────
+function useSoundSystem(muted) {
+  const acRef      = useRef(null);
+  const themeTimer = useRef(null);
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; clearTimeout(themeTimer.current); }; }, []);
+
+  const getAC = () => {
+    try {
+      if (!acRef.current || acRef.current.state === 'closed') {
+        acRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (acRef.current.state === 'suspended') acRef.current.resume();
+      return acRef.current;
+    } catch (_) { return null; }
+  };
+
+  const playTone = (freq, type = 'square', vol = 0.2, dur = 0.18, when = 0) => {
+    if (muted) return;
+    const ac = getAC(); if (!ac) return;
+    const t = when || ac.currentTime;
+    const osc = ac.createOscillator(), g = ac.createGain();
+    osc.connect(g); g.connect(ac.destination);
+    osc.type = type; osc.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.9);
+    osc.start(t); osc.stop(t + dur + 0.02);
+  };
+
+  const playImpact = () => {
+    if (muted) return;
+    const ac = getAC(); if (!ac) return;
+    const t = ac.currentTime;
+    const osc = ac.createOscillator(), g = ac.createGain();
+    osc.connect(g); g.connect(ac.destination);
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(200, t);
+    osc.frequency.exponentialRampToValueAtTime(38, t + 0.38);
+    g.gain.setValueAtTime(0.42, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+    osc.start(t); osc.stop(t + 0.42);
+    playTone(880, 'square', 0.12, 0.07, t);
+  };
+
+  const playVictory = () => {
+    if (muted) return;
+    const ac = getAC(); if (!ac) return;
+    const t = ac.currentTime;
+    [293, 369, 440, 587].forEach((f, i) => playTone(f, 'square', 0.22, 0.2, t + i * 0.13));
+    setTimeout(() => { const ac2 = getAC(); if (ac2) playTone(880, 'square', 0.18, 0.45, ac2.currentTime); }, 600);
+  };
+
+  const playCheerSfx = () => {
+    if (muted) return;
+    const ac = getAC(); if (!ac) return;
+    const t = ac.currentTime;
+    [220, 277, 330, 440, 523].forEach((f, i) => playTone(f, 'sine', 0.11, 0.35, t + i * 0.055));
+    playTone(659, 'sine', 0.14, 0.5, t + 0.28);
+  };
+
+  // Fight theme — D minor, 16-step square-wave loop
+  const THEME_NOTES = [
+    [293,1],[0,0.5],[440,0.5],[523,1],[587,0.5],[523,0.5],
+    [440,1],[349,0.5],[0,0.5],[392,0.5],[440,0.5],[0,0.5],
+    [293,1.5],[0,0.5],[220,1],[0,1],
+  ];
+  const BEAT_SEC = 0.13;
+  useEffect(() => {
+    if (muted) { clearTimeout(themeTimer.current); return; }
+    let nextTime = (getAC()?.currentTime ?? 0) + 0.1;
+    let step = 0;
+    const schedule = () => {
+      if (!mountedRef.current) return;
+      const ac = getAC(); if (!ac) return;
+      while (nextTime < ac.currentTime + 1.5) {
+        const [freq, beats] = THEME_NOTES[step % THEME_NOTES.length];
+        if (freq > 0) playTone(freq, 'square', 0.13, beats * BEAT_SEC * 0.80, nextTime);
+        nextTime += beats * BEAT_SEC;
+        step++;
+      }
+      themeTimer.current = setTimeout(schedule, 400);
+    };
+    schedule();
+    return () => clearTimeout(themeTimer.current);
+  }, [muted]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { playImpact, playVictory, playCheerSfx };
+}
+
+// ─────────────────────────────────────────────────────────────────
 //  FIGHT VIEWER
 // ─────────────────────────────────────────────────────────────────
 const PHASE_DURATIONS = {
   Shikiri: 3000, Tachiai: 1700, 'Grip Battle': 2400, 'Push & Position': 2000, Finish: 4200,
 };
+const INTRO_DURATIONS = [1400, 1400, 1000]; // ms for w1-enter, w2-enter, vs-screen
 
-function FightViewer({ bout, onClose, kachiKoshi }) {
+function FightViewer({ bout, onClose, kachiKoshi, lang = 'EN' }) {
   const [phase, setPhase] = useState(0);
-  const timerRef = useRef(null);
-  const cur = bout.phases[phase];
-  const isLast = phase === bout.phases.length - 1;
+  const timerRef  = useRef(null);
 
+  // Intro sequence state
+  const [introStep, setIntroStep] = useState(0); // 0=w1, 1=w2, 2=vs, 3=done
+  const [introT,    setIntroT]    = useState(0);
+  const introRafRef = useRef(null);
+
+  // Cheer state
+  const [cheerActive, setCheerActive] = useState(false);
+  const cheerActiveRef = useRef(false);
+  const cheerTimerRef  = useRef(null);
+
+  // Sound & mute
+  const [muted, setMuted] = useState(false);
+  const { playImpact, playVictory, playCheerSfx } = useSoundSystem(muted);
+
+  // HP timeline
+  const hpTimeline = computeHpTimeline(bout.phases);
+
+  const cur    = bout.phases[phase];
+  const isLast = phase === bout.phases.length - 1;
+  const [hp1, hp2] = hpTimeline[phase] ?? [100, 100];
+
+  // ── Intro RAF loop ─────────────────────────────────────────────
   useEffect(() => {
+    let step = 0, startMs = performance.now();
+    const loop = (now) => {
+      const elapsed = now - startMs;
+      const t = Math.min(1, elapsed / INTRO_DURATIONS[step]);
+      setIntroT(t);
+      setIntroStep(step);
+      if (t < 1) { introRafRef.current = requestAnimationFrame(loop); return; }
+      if (step < 2) { step++; startMs = now; introRafRef.current = requestAnimationFrame(loop); }
+      else setIntroStep(3);
+    };
+    introRafRef.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(introRafRef.current);
+  }, []);
+
+  // ── Phase auto-advance ─────────────────────────────────────────
+  useEffect(() => {
+    if (introStep < 3) return; // wait for intro
     if (isLast) { clearTimeout(timerRef.current); return; }
     timerRef.current = setTimeout(
-      () => setPhase(p => Math.min(p + 1, bout.phases.length - 1)),
+      () => setPhase(p => {
+        const next = Math.min(p + 1, bout.phases.length - 1);
+        const nextPhase = bout.phases[next];
+        if (nextPhase.name === 'Tachiai') playImpact();
+        if (nextPhase.name === 'Finish')  { nextPhase.winner === 'w1' ? playVictory() : playImpact(); }
+        return next;
+      }),
       PHASE_DURATIONS[cur.name] ?? 2400
     );
     return () => clearTimeout(timerRef.current);
-  }, [phase, isLast, bout.phases.length, cur.name]);
+  }, [phase, isLast, introStep, bout.phases.length, cur.name]);
 
-  const advance = () => {
+  const advanceFight = () => {
+    if (introStep < 3) { setIntroStep(3); cancelAnimationFrame(introRafRef.current); return; }
     if (isLast) { onClose(); return; }
     clearTimeout(timerRef.current);
-    setPhase(p => Math.min(p + 1, bout.phases.length - 1));
+    setPhase(p => {
+      const next = Math.min(p + 1, bout.phases.length - 1);
+      const nextPhase = bout.phases[next];
+      if (nextPhase.name === 'Tachiai') playImpact();
+      if (nextPhase.name === 'Finish')  { nextPhase.winner === 'w1' ? playVictory() : playImpact(); }
+      return next;
+    });
+  };
+
+  const onCheer = (e) => {
+    e.stopPropagation();
+    if (cheerActive) return;
+    setCheerActive(true);
+    cheerActiveRef.current = true;
+    playCheerSfx();
+    clearTimeout(cheerTimerRef.current);
+    cheerTimerRef.current = setTimeout(() => {
+      setCheerActive(false);
+      cheerActiveRef.current = false;
+    }, 1800);
   };
 
   const advColor = cur.adv === 'w1' ? '#c9a84c' : cur.adv === 'w2' ? '#e84040' : '#666';
@@ -871,17 +1187,29 @@ function FightViewer({ bout, onClose, kachiKoshi }) {
   const GOLD = '#c9a84c', RED = '#e84040';
 
   return (
-    <div onClick={advance} style={{ position:'fixed', inset:0, zIndex:200, background:'#07060e', overflowY:'auto', display:'flex', flexDirection:'column', alignItems:'center', cursor:'pointer' }}>
+    <div onClick={advanceFight} style={{ position:'fixed', inset:0, zIndex:200, background:'#07060e', overflowY:'auto', display:'flex', flexDirection:'column', alignItems:'center', cursor:'pointer' }}>
+
+      {/* Cheer glow overlay */}
+      {cheerActive && introStep >= 3 && (
+        <div style={{ position:'fixed', inset:0, pointerEvents:'none', background:'rgba(100,60,10,0.12)', zIndex:201, mixBlendMode:'screen' }} />
+      )}
 
       {/* Header */}
-      <div style={{ width:'100%', maxWidth:430, display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px 8px' }} onClick={e => { e.stopPropagation(); onClose(); }}>
-        <span style={{ color:GOLD, fontFamily:'JetBrains Mono,monospace', fontSize:11, letterSpacing:3, fontWeight:700 }}>DOHYŌ 土俵</span>
-        <span style={{ color:'#444', fontSize:22, lineHeight:1 }}>✕</span>
+      <div style={{ width:'100%', maxWidth:430, display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px 8px' }}>
+        <span style={{ color:GOLD, fontFamily:'JetBrains Mono,monospace', fontSize:11, letterSpacing:3, fontWeight:700 }}>
+          DOHYŌ · {T('dohyo_lbl', lang)}
+        </span>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <button onClick={e => { e.stopPropagation(); setMuted(m => !m); }}
+                  style={{ background:'none', border:'none', color:muted?'#555':'#777', fontSize:17, cursor:'pointer', padding:'2px 6px', lineHeight:1 }}>
+            {muted ? '🔇' : '🔊'}
+          </button>
+          <span onClick={e => { e.stopPropagation(); onClose(); }} style={{ color:'#444', fontSize:22, lineHeight:1, cursor:'pointer' }}>✕</span>
+        </div>
       </div>
 
       {/* Wrestler nameplates with portraits */}
-      <div style={{ width:'100%', maxWidth:430, display:'flex', justifyContent:'space-between', alignItems:'flex-end', padding:'0 12px 8px', gap:8 }}>
-        {/* Left (player wrestler) */}
+      <div style={{ width:'100%', maxWidth:430, display:'flex', justifyContent:'space-between', alignItems:'flex-end', padding:'0 12px 6px', gap:8 }}>
         <div style={{ display:'flex', alignItems:'flex-end', gap:8, flex:1 }}>
           <WrestlerPortrait wrestler={bout.w1} side="left" />
           <div>
@@ -891,9 +1219,7 @@ function FightViewer({ bout, onClose, kachiKoshi }) {
             <div style={{ width:6, height:6, borderRadius:'50%', background: PERSONALITY_COLORS[bout.w1.personality] || '#555', marginTop:3 }} />
           </div>
         </div>
-        {/* VS divider */}
-        <div style={{ color:'#1a1a30', fontFamily:'Noto Serif JP,serif', fontSize:18, paddingBottom:6 }}>対</div>
-        {/* Right (opponent) — mirrored layout */}
+        <div style={{ color:'#1a1a30', fontFamily:'Noto Serif JP,serif', fontSize:18, paddingBottom:6 }}>{T('vs_divider', lang)}</div>
         <div style={{ display:'flex', alignItems:'flex-end', gap:8, flex:1, flexDirection:'row-reverse' }}>
           <WrestlerPortrait wrestler={bout.w2} side="right" />
           <div style={{ textAlign:'right' }}>
@@ -905,41 +1231,88 @@ function FightViewer({ bout, onClose, kachiKoshi }) {
         </div>
       </div>
 
-      {/* Arena — Sega-style 2D Canvas */}
-      <BoutCanvas phases={bout.phases} currentPhase={phase}
-                  names={{ n1: bout.w1.name, n2: bout.w2.name }}
-                  wrestlers={{ w1: bout.w1, w2: bout.w2 }} />
+      {/* HP Bars — Street Fighter style */}
+      {introStep >= 3 && (
+        <div style={{ width:'100%', maxWidth:430, padding:'0 14px 6px', display:'flex', gap:6, alignItems:'center' }}>
+          <div style={{ flex:1, height:10, background:'#0a0918', borderRadius:5, border:'1px solid #1a1a30', overflow:'hidden' }}>
+            <div style={{ height:'100%', width:`${hp1}%`,
+                          background: hp1 > 40 ? '#44cc66' : hp1 > 15 ? '#e8a840' : '#e84040',
+                          borderRadius:5, transition:'width 0.55s ease-out',
+                          boxShadow: hp1 <= 15 ? '0 0 8px #e84040' : 'none' }} />
+          </div>
+          <div style={{ color:'#252540', fontSize:8, fontFamily:'JetBrains Mono,monospace', letterSpacing:1, flexShrink:0 }}>HP</div>
+          <div style={{ flex:1, height:10, background:'#0a0918', borderRadius:5, border:'1px solid #1a1a30', overflow:'hidden', transform:'scaleX(-1)' }}>
+            <div style={{ height:'100%', width:`${hp2}%`,
+                          background: hp2 > 40 ? '#4488cc' : hp2 > 15 ? '#e8a840' : '#e84040',
+                          borderRadius:5, transition:'width 0.55s ease-out',
+                          boxShadow: hp2 <= 15 ? '0 0 8px #e84040' : 'none' }} />
+          </div>
+        </div>
+      )}
+
+      {/* Arena canvas — intro or fight */}
+      {introStep < 3
+        ? <IntroCanvas w1={bout.w1} w2={bout.w2} step={introStep} t={introT} />
+        : <BoutCanvas phases={bout.phases} currentPhase={phase}
+                      names={{ n1: bout.w1.name, n2: bout.w2.name }}
+                      wrestlers={{ w1: bout.w1, w2: bout.w2 }}
+                      cheerActiveRef={cheerActiveRef} />
+      }
 
       {/* Phase progress dots */}
-      <div style={{ display:'flex', gap:6, padding:'14px 0 6px' }}>
-        {bout.phases.map((_, i) => (
-          <div key={i} style={{ width:i === phase ? 22 : 8, height:6, borderRadius:3, background: i <= phase ? advColor : '#1a1a2e', transition:'all 0.3s' }} />
-        ))}
-      </div>
+      {introStep >= 3 && (
+        <div style={{ display:'flex', gap:6, padding:'12px 0 4px' }}>
+          {bout.phases.map((_, i) => (
+            <div key={i} style={{ width:i === phase ? 22 : 8, height:6, borderRadius:3, background: i <= phase ? advColor : '#1a1a2e', transition:'all 0.3s' }} />
+          ))}
+        </div>
+      )}
+
+      {/* Cheer button */}
+      {introStep >= 3 && !isLast && (
+        <button onClick={onCheer} style={{
+          background: cheerActive ? GOLD : '#0d0c1c',
+          color: cheerActive ? '#0a0a0f' : '#3a3a60',
+          border: `1px solid ${cheerActive ? GOLD : '#1a1a36'}`,
+          borderRadius: 20, padding: '6px 24px',
+          fontFamily: 'Noto Serif JP,serif', fontSize: 13, fontWeight: 700,
+          cursor: 'pointer', letterSpacing: 2, marginTop: 4,
+          boxShadow: cheerActive ? `0 0 18px ${GOLD}` : 'none',
+          transition: 'all 0.15s',
+        }}>
+          {cheerActive ? '🔥 応援中！' : '👊 GANBARE!'}
+        </button>
+      )}
 
       {/* Phase label */}
-      <div style={{ color:'#333', fontFamily:'JetBrains Mono,monospace', fontSize:10, letterSpacing:3, marginBottom:4 }}>{cur.name.toUpperCase()}</div>
+      {introStep >= 3 && (
+        <div style={{ color:'#333', fontFamily:'JetBrains Mono,monospace', fontSize:10, letterSpacing:3, marginTop:8, marginBottom:4 }}>{cur.name.toUpperCase()}</div>
+      )}
 
       {/* Advantage chip */}
-      <div style={{ color: advColor, fontFamily:'JetBrains Mono,monospace', fontSize:12, fontWeight:700, letterSpacing:1, marginBottom:10, minHeight:18 }}>
-        {advName ? `▶ ${advName}` : '— EVEN —'}
-      </div>
+      {introStep >= 3 && (
+        <div style={{ color: advColor, fontFamily:'JetBrains Mono,monospace', fontSize:12, fontWeight:700, letterSpacing:1, marginBottom:10, minHeight:18 }}>
+          {advName ? `▶ ${advName}` : '— EVEN —'}
+        </div>
+      )}
 
       {/* Commentary */}
-      <div style={{ maxWidth:370, width:'92%', background:'#0c0b18', border:'1px solid #1a1836', borderRadius:12, padding:'14px 18px', marginBottom:14, minHeight:64, display:'flex', alignItems:'center', justifyContent:'center' }}>
-        <p style={{ color:'#c8c4d8', fontFamily:'Noto Serif JP,serif', fontSize:14, lineHeight:1.6, margin:0, textAlign:'center' }}>{cur.text}</p>
-      </div>
+      {introStep >= 3 && (
+        <div style={{ maxWidth:370, width:'92%', background:'#0c0b18', border:'1px solid #1a1836', borderRadius:12, padding:'14px 18px', marginBottom:14, minHeight:64, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <p style={{ color:'#c8c4d8', fontFamily:'Noto Serif JP,serif', fontSize:14, lineHeight:1.6, margin:0, textAlign:'center' }}>{cur.text}</p>
+        </div>
+      )}
 
       {/* Kachi-koshi overlay */}
-      {isLast && kachiKoshi && cur.winner === 'w1' && (
+      {introStep >= 3 && isLast && kachiKoshi && cur.winner === 'w1' && (
         <div style={{ maxWidth:370, width:'92%', background:'linear-gradient(135deg,#0c1a08,#0a1408)', border:'1px solid rgba(68,204,102,0.5)', borderRadius:12, padding:'14px', marginBottom:10, textAlign:'center', boxShadow:'0 0 24px rgba(68,204,102,0.15)' }}>
-          <div style={{ color:GREEN, fontSize:22, fontFamily:'Noto Serif JP,serif', fontWeight:700, letterSpacing:2 }}>勝ち越し</div>
+          <div style={{ color:GREEN, fontSize:22, fontFamily:'Noto Serif JP,serif', fontWeight:700, letterSpacing:2 }}>{T('kachi', lang)}</div>
           <div style={{ color:'#2a5a2a', fontFamily:'JetBrains Mono,monospace', fontSize:10, letterSpacing:4 }}>KACHI-KOSHI · MAJORITY WINS</div>
         </div>
       )}
 
       {/* Kimarite flash */}
-      {isLast && (
+      {introStep >= 3 && isLast && (
         <div style={{ fontFamily:'Noto Serif JP,serif', fontSize:18, fontWeight:700,
                       color: cur.winner==='w1' ? GOLD : RED,
                       letterSpacing:3, marginBottom:6, textAlign:'center' }}>
@@ -948,7 +1321,7 @@ function FightViewer({ bout, onClose, kachiKoshi }) {
       )}
 
       {/* Finish highlight card */}
-      {isLast && (
+      {introStep >= 3 && isLast && (
         <div style={{ maxWidth:370, width:'92%', background:'linear-gradient(135deg,#0e0b1c,#150c10)', border:`1px solid ${cur.winner==='w1'?GOLD:RED}`, borderRadius:14, padding:'18px 22px', marginBottom:16, textAlign:'center' }}>
           <div style={{ fontSize:26, fontWeight:700, fontFamily:'Noto Serif JP,serif', color:cur.winner==='w1'?GOLD:RED, marginBottom:6 }}>
             {cur.winner === 'w1' ? '⚡ VICTORY' : '✗ DEFEAT'}
@@ -968,7 +1341,10 @@ function FightViewer({ bout, onClose, kachiKoshi }) {
         </div>
       )}
 
-      {!isLast && (
+      {introStep < 3 && (
+        <div style={{ color:'#282840', fontSize:11, fontFamily:'JetBrains Mono,monospace', paddingBottom:24, paddingTop:8 }}>TAP TO SKIP INTRO</div>
+      )}
+      {introStep >= 3 && !isLast && (
         <div style={{ color:'#282840', fontSize:11, fontFamily:'JetBrains Mono,monospace', paddingBottom:24 }}>TAP TO ADVANCE · AUTO-ADVANCING</div>
       )}
     </div>
@@ -1111,6 +1487,7 @@ function Section({ label, children }) {
 //  MAIN APP
 // ─────────────────────────────────────────────────────────────────
 export default function App() {
+  const [lang, setLang]         = useState('EN');
   const [tab, setTab]           = useState('stable');
   const [stable, setStable]     = useState({ name:'Thunder Gate Stable', funds:2400000, reputation:45, year:2024, month:1, day:1, time:'Morning' });
   const [wrestlers, setWrestlers] = useState(INITIAL_WRESTLERS);
@@ -1413,7 +1790,7 @@ export default function App() {
       })()}
 
       {/* Avg condition */}
-      <Section label="HEYA STATUS (部屋の状態)">
+      <Section label={lang === 'EN' ? 'STABLE STATUS' : 'HEYA STATUS (部屋の状態)'}>
         <Card elevated style={{ margin:'0 16px', padding:'14px' }}>
           {['morale','fatigue','discipline'].map(s => <CondBar key={s} stat={s} val={avgCond(s)} />)}
         </Card>
@@ -1443,7 +1820,7 @@ export default function App() {
         </div>
         {selW.injured && <div style={{ color:RED, fontSize:11, fontFamily:'JetBrains Mono,monospace', marginTop:4 }}>⚠ INJURED — {selW.injuryDays} sessions remaining</div>}
       </div>
-      <Section label="基本能力 · STATS">
+      <Section label={lang === 'EN' ? 'BASE STATS' : '基本能力 · STATS'}>
         <Card elevated style={{ margin:'0 16px', padding:'12px' }}>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
             {Object.entries(selW.stats).map(([s, v]) => (
@@ -1458,12 +1835,12 @@ export default function App() {
           </div>
         </Card>
       </Section>
-      <Section label="状態 · CONDITION">
+      <Section label={lang === 'EN' ? 'CONDITION' : '状態 · CONDITION'}>
         <Card elevated style={{ margin:'0 16px', padding:'14px' }}>
           {Object.entries(selW.condition).map(([s, v]) => <CondBar key={s} stat={s} val={v} />)}
         </Card>
       </Section>
-      <Section label="力士情報 · PROFILE">
+      <Section label={lang === 'EN' ? 'PROFILE' : '力士情報 · PROFILE'}>
         <Card elevated style={{ margin:'0 16px', padding:'14px' }}>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:12 }}>
             <div>
@@ -1485,7 +1862,9 @@ export default function App() {
   ) : (
     // Roster list
     <div style={{ padding:'12px 16px 88px' }}>
-      <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, marginBottom:10 }}>RIKISHI (力士) — {wrestlers.length}</div>
+      <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, marginBottom:10 }}>
+        {lang === 'EN' ? `WRESTLERS — ${wrestlers.length}` : `RIKISHI (力士) — ${wrestlers.length}`}
+      </div>
       {wrestlers.map(w => {
         const eff = Math.round(calcEffective(w));
         return (
@@ -1529,7 +1908,7 @@ export default function App() {
 
   const TrainScreen = (
     <div style={{ padding:'0 0 88px' }}>
-      <Section label="DEFAULT KEIKO STYLE (稽古)">
+      <Section label={lang === 'EN' ? 'DEFAULT TRAINING STYLE' : 'DEFAULT KEIKO STYLE (稽古)'}>
         {TRAINING_POLICIES.map(p => (
           <div key={p.id} onClick={() => setPolicy(p.id)} style={{ margin:'0 16px 6px', padding:'12px 14px', background: policy===p.id ? '#121228' : '#0d0d1c', borderRadius:12, border:`1px solid ${policy===p.id?GOLD:'#181830'}`, cursor:'pointer', boxShadow: policy===p.id ? '0 0 0 1px rgba(200,168,76,0.2), 0 4px 16px rgba(0,0,0,0.4)' : 'none' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
@@ -1546,7 +1925,7 @@ export default function App() {
         ))}
       </Section>
 
-      <Section label="HEYA CULTURE (部屋の風土)">
+      <Section label={lang === 'EN' ? 'STABLE CULTURE' : 'HEYA CULTURE (部屋の風土)'}>
         {DISCIPLINE_LEVELS.map(d => (
           <div key={d.id} onClick={() => setDisc(d.id)} style={{ margin:'0 16px 6px', padding:'12px 14px', background: discipline===d.id ? '#121228' : '#0d0d1c', borderRadius:12, border:`1px solid ${discipline===d.id?GOLD:'#181830'}`, cursor:'pointer' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
@@ -1562,7 +1941,7 @@ export default function App() {
         ))}
       </Section>
 
-      <Section label="RIKISHI KEIKO ASSIGNMENT (力士稽古)">
+      <Section label={lang === 'EN' ? 'TRAINING ASSIGNMENT' : 'RIKISHI KEIKO ASSIGNMENT (力士稽古)'}>
         <div style={{ margin:'0 16px 4px', padding:'6px 10px', background:'#0a0a18', borderRadius:8, border:'1px solid #181830' }}>
           <span style={{ color:'#2e2e50', fontSize:9, fontFamily:'JetBrains Mono,monospace', letterSpacing:2 }}>ASSIGN INDIVIDUAL KEIKO · TAP TO OVERRIDE · ↺ = USING DEFAULT</span>
         </div>
@@ -1624,7 +2003,7 @@ export default function App() {
 
   const ScoutScreen = (
     <div style={{ padding:'12px 16px 88px' }}>
-      <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, marginBottom:10 }}>SCOUT REPORT (スカウトレポート)</div>
+      <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, marginBottom:10 }}>{lang === 'EN' ? 'SCOUT REPORT' : 'SCOUT REPORT (スカウトレポート)'}</div>
       {prospects.length === 0 && <div style={{ color:'#252540', fontFamily:'Noto Serif JP,serif', fontSize:14, fontStyle:'italic', padding:20, textAlign:'center' }}>No prospects. Check back next season.</div>}
       {prospects.map(p => (
         <Card key={p.id} style={{ marginBottom:10, padding:'14px' }}>
@@ -1697,7 +2076,9 @@ export default function App() {
               border: `1px solid ${res.kachiKoshi ? 'rgba(68,204,102,0.3)' : 'rgba(232,64,64,0.3)'}`,
             }}>
               <div style={{ color: res.kachiKoshi ? GREEN : RED, fontSize:16, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>
-                {res.kachiKoshi ? '勝ち越し KACHI-KOSHI' : '負け越し MAKE-KOSHI'}
+                {res.kachiKoshi
+                  ? (lang === 'EN' ? 'KACHI-KOSHI — MAJORITY WINS' : '勝ち越し KACHI-KOSHI')
+                  : (lang === 'EN' ? 'MAKE-KOSHI — MAJORITY LOSSES' : '負け越し MAKE-KOSHI')}
               </div>
               <div style={{ color:'#444', fontSize:10, fontFamily:'JetBrains Mono,monospace', marginTop:2 }}>
                 {res.kachiKoshi ? 'MAJORITY WINS — PROMOTED' : 'MAJORITY LOSSES — DEMOTED'}
@@ -1891,11 +2272,11 @@ export default function App() {
 
   // ── TABS ─────────────────────────────────────────────────────
   const TABS = [
-    { id:'stable', label:'HEYA',    icon:'⛩' },
-    { id:'roster', label:'RIKISHI', icon:'👥' },
-    { id:'train',  label:'KEIKO',   icon:'⚡' },
-    { id:'scout',  label:'SCOUT',   icon:'🔭' },
-    { id:'basho',  label:'BASHO',   icon:'🏆' },
+    { id:'stable', labelKey:'tab_stable', icon:'⛩' },
+    { id:'roster', labelKey:'tab_roster', icon:'👥' },
+    { id:'train',  labelKey:'tab_train',  icon:'⚡' },
+    { id:'scout',  labelKey:null,         icon:'🔭', label:'SCOUT' },
+    { id:'basho',  labelKey:'tab_basho',  icon:'🏆' },
   ];
 
   const SCREENS = { stable: StableScreen, roster: RosterScreen, train: TrainScreen, scout: ScoutScreen, basho: BashoScreen };
@@ -1921,8 +2302,12 @@ export default function App() {
               <div style={{ color: fundsFlash === 'up' ? '#44cc66' : fundsFlash === 'down' ? '#e84040' : GOLD, fontSize:13, fontWeight:700, fontFamily:'JetBrains Mono,monospace', transition:'color 0.15s' }}>¥{(stable.funds/1000).toFixed(0)}k</div>
               <div style={{ color:'#282848', fontSize:9, fontFamily:'JetBrains Mono,monospace', letterSpacing:1 }}>FUNDS</div>
             </div>
+            <button onClick={() => setLang(l => l === 'EN' ? 'JP' : 'EN')}
+                    style={{ background:'#0d0d1c', color:'#555', border:'1px solid #1a1a36', borderRadius:6, padding:'6px 8px', fontFamily:'JetBrains Mono,monospace', fontSize:9, cursor:'pointer', letterSpacing:1 }}>
+              🌐 {lang === 'EN' ? 'JP' : 'EN'}
+            </button>
             <button onClick={advance} style={{ background:GOLD, color:'#0a0a0f', border:'none', borderRadius:8, padding:'8px 13px', fontFamily:'JetBrains Mono,monospace', fontSize:10, fontWeight:700, cursor:'pointer', letterSpacing:1, whiteSpace:'nowrap' }}>
-              稽古 ADVANCE ▶
+              {T('advance_btn', lang)}
             </button>
           </div>
         </div>
@@ -1936,13 +2321,15 @@ export default function App() {
         {TABS.map(t => (
           <button key={t.id} onClick={() => { setTab(t.id); setSelW(null); }} style={{ flex:1, background:'none', border:'none', cursor:'pointer', padding:'8px 0 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
             <span style={{ fontSize:20 }}>{t.icon}</span>
-            <span style={{ fontSize:9, fontFamily:'JetBrains Mono,monospace', color: tab===t.id ? GOLD : '#282848', letterSpacing:1, fontWeight: tab===t.id ? 700 : 400 }}>{t.label.toUpperCase()}</span>
+            <span style={{ fontSize:9, fontFamily:'JetBrains Mono,monospace', color: tab===t.id ? GOLD : '#282848', letterSpacing:1, fontWeight: tab===t.id ? 700 : 400 }}>
+              {(t.labelKey ? T(t.labelKey, lang) : t.label).toUpperCase()}
+            </span>
           </button>
         ))}
       </div>
 
       {/* Fight Viewer modal */}
-      {viewer && <FightViewer bout={viewer} onClose={() => setViewer(null)} kachiKoshi={viewer.kachiKoshi} />}
+      {viewer && <FightViewer bout={viewer} onClose={() => setViewer(null)} kachiKoshi={viewer.kachiKoshi} lang={lang} />}
     </div>
     </>
   );
