@@ -727,7 +727,7 @@ function FightViewer({ bout, onClose, kachiKoshi }) {
 
       {/* Header */}
       <div style={{ width:'100%', maxWidth:430, display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px 8px' }} onClick={e => { e.stopPropagation(); onClose(); }}>
-        <span style={{ color:GOLD, fontFamily:'JetBrains Mono,monospace', fontSize:11, letterSpacing:3, fontWeight:700 }}>FIGHT VIEWER</span>
+        <span style={{ color:GOLD, fontFamily:'JetBrains Mono,monospace', fontSize:11, letterSpacing:3, fontWeight:700 }}>DOHYŌ 土俵</span>
         <span style={{ color:'#444', fontSize:22, lineHeight:1 }}>✕</span>
       </div>
 
@@ -1040,15 +1040,22 @@ export default function App() {
       return { ...w, stats: newStats, condition: { morale: mor, fatigue: fat, discipline: disc }, injured, injuryDays };
     }));
 
-    // Rare random events
+    // Rare heya events
     if (Math.random() < 0.12) {
+      const rikishi = wrestlers.length > 0 ? wrestlers[ri(0, wrestlers.length - 1)].name : 'A rikishi';
       const picks = [
-        'A local sponsor enquiry arrives. Potential boost to funds.',
-        'A media outlet requests an interview with your stable.',
-        `${wrestlers.length > 0 ? wrestlers[ri(0, wrestlers.length - 1)].name : 'A wrestler'} had a breakthrough training session.`,
-        'Rival stable scouts were spotted near your training facility.',
-        'A young fan sends an encouraging letter to the stable.',
-        'Your stable\'s record is being discussed in sumo circles.',
+        `${rikishi} showed exceptional tachiai explosiveness during morning keiko.`,
+        `A corporate sponsor has made enquiries about the heya. Funds may follow.`,
+        `A senior gyōji visited to observe training — the rikishi performed with pride.`,
+        `${rikishi} was praised by the shisho for discipline in shiko drills.`,
+        `Word has spread in sumo circles about ${rikishi}'s kimarite skill.`,
+        `A rival oyakata was seen observing keiko from outside the heya gates.`,
+        `The heya dohyō was freshly resurfaced — spirits are high this morning.`,
+        `${rikishi} trained late into the evening by lamplight. Dedication noted.`,
+        `A former makuuchi rikishi stopped by to offer technique advice.`,
+        `${rikishi} demonstrated flawless mawashi form in today's butsukari-geiko.`,
+        `Fan letters from the prefecture have arrived — the heya's fame is growing.`,
+        `A local newspaper featured the heya — recruitment interest is expected.`,
       ];
       pushEvent('info', rnd(picks));
     }
@@ -1067,9 +1074,9 @@ export default function App() {
   // ── BASHO ────────────────────────────────────────────────────
   const startBasho = () => {
     const active = wrestlers.filter(w => !w.injured).slice(0, 4);
-    const BASHO_NAMES = ['January', 'March', 'May', 'July', 'September', 'November'];
+    const HONBASHO_NAMES = ['Hatsu 初場所','Haru 春場所','Natsu 夏場所','Nagoya 名古屋場所','Aki 秋場所','Kyushu 九州場所'];
     const bashoIdx  = BASHO_MONTHS.indexOf(stable.month);
-    const bashoName = bashoIdx !== -1 ? `${BASHO_NAMES[bashoIdx]} Basho` : 'Grand Tournament';
+    const bashoName = bashoIdx !== -1 ? HONBASHO_NAMES[bashoIdx] : 'Grand Tournament';
     const schedule = {};
     active.forEach(w => {
       schedule[w.id] = Array.from({ length: 15 }, (_, i) => ({
@@ -1195,7 +1202,7 @@ export default function App() {
       {/* Stat strip */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:1, margin:'12px 16px', borderRadius:10, overflow:'hidden', border:'1px solid #181830' }}>
         {[
-          { label:'WRESTLERS', val: wrestlers.length },
+          { label:'RIKISHI',   val: wrestlers.length },
           { label:'INJURED',   val: wrestlers.filter(w=>w.injured).length, warn:true },
           { label:'REPUTATION',val: stable.reputation },
         ].map(x => (
@@ -1205,6 +1212,32 @@ export default function App() {
           </div>
         ))}
       </div>
+
+      {/* Basho countdown strip */}
+      {(() => {
+        const HATSU_NAMES = ['Hatsu 初場所','Haru 春場所','Natsu 夏場所','Nagoya 名古屋場所','Aki 秋場所','Kyushu 九州場所'];
+        const HATSU_VENUES = ['Ryōgoku Kokugikan, Tokyo','EDION Arena, Osaka','Ryōgoku Kokugikan, Tokyo','Dolphins Arena, Nagoya','Ryōgoku Kokugikan, Tokyo','Marine Messe, Fukuoka'];
+        const nextBashoIdx = BASHO_MONTHS.findIndex(m => m > stable.month) !== -1
+          ? BASHO_MONTHS.findIndex(m => m > stable.month)
+          : 0;
+        const nextBashoMonth = BASHO_MONTHS[nextBashoIdx];
+        const daysUntil = (nextBashoMonth - stable.month) * 30 + (1 - stable.day);
+        const isBashoMonth = BASHO_MONTHS.includes(stable.month);
+        return (
+          <div style={{ margin:'0 16px 8px', padding:'10px 14px', background:'#0d0d1c', borderRadius:10, border:'1px solid #181830', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <div>
+              <div style={{ color:GOLD, fontFamily:'Noto Serif JP,serif', fontSize:13, fontWeight:700 }}>{HATSU_NAMES[nextBashoIdx]}</div>
+              <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:1 }}>{HATSU_VENUES[nextBashoIdx]}</div>
+            </div>
+            <div style={{ textAlign:'right' }}>
+              {isBashoMonth
+                ? <div style={{ color:GREEN, fontFamily:'JetBrains Mono,monospace', fontSize:11, fontWeight:700 }}>● NOW</div>
+                : <div style={{ color:'#555', fontFamily:'JetBrains Mono,monospace', fontSize:11 }}>{Math.max(0, daysUntil)}d away</div>
+              }
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Avg condition */}
       <Section label="HEYA STATUS (部屋の状態)">
@@ -1237,7 +1270,7 @@ export default function App() {
         </div>
         {selW.injured && <div style={{ color:RED, fontSize:11, fontFamily:'JetBrains Mono,monospace', marginTop:4 }}>⚠ INJURED — {selW.injuryDays} sessions remaining</div>}
       </div>
-      <Section label="BASE STATS">
+      <Section label="基本能力 · STATS">
         <Card elevated style={{ margin:'0 16px', padding:'12px' }}>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
             {Object.entries(selW.stats).map(([s, v]) => (
@@ -1252,12 +1285,12 @@ export default function App() {
           </div>
         </Card>
       </Section>
-      <Section label="CONDITION">
+      <Section label="状態 · CONDITION">
         <Card elevated style={{ margin:'0 16px', padding:'14px' }}>
           {Object.entries(selW.condition).map(([s, v]) => <CondBar key={s} stat={s} val={v} />)}
         </Card>
       </Section>
-      <Section label="PROFILE">
+      <Section label="力士情報 · PROFILE">
         <Card elevated style={{ margin:'0 16px', padding:'14px' }}>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:12 }}>
             <div>
@@ -1418,7 +1451,7 @@ export default function App() {
 
   const ScoutScreen = (
     <div style={{ padding:'12px 16px 88px' }}>
-      <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, marginBottom:10 }}>AVAILABLE PROSPECTS</div>
+      <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, marginBottom:10 }}>SCOUT REPORT (スカウトレポート)</div>
       {prospects.length === 0 && <div style={{ color:'#252540', fontFamily:'Noto Serif JP,serif', fontSize:14, fontStyle:'italic', padding:20, textAlign:'center' }}>No prospects. Check back next season.</div>}
       {prospects.map(p => (
         <Card key={p.id} style={{ marginBottom:10, padding:'14px' }}>
@@ -1508,7 +1541,7 @@ export default function App() {
     // Pre-basho lobby
     <div style={{ padding:'40px 16px 88px', textAlign:'center' }}>
       <div style={{ color:GOLD, fontSize:28, fontFamily:'Noto Serif JP,serif', fontWeight:700, marginBottom:4 }}>
-        {(() => { const names = ['January','March','May','July','September','November']; const idx = BASHO_MONTHS.indexOf(stable.month); return idx !== -1 ? `${names[idx]} Basho` : 'Grand Tournament'; })()}
+        {(() => { const names = ['Hatsu 初場所','Haru 春場所','Natsu 夏場所','Nagoya 名古屋場所','Aki 秋場所','Kyushu 九州場所']; const idx = BASHO_MONTHS.indexOf(stable.month); return idx !== -1 ? names[idx] : 'Grand Tournament'; })()}
       </div>
       <div style={{ color:'#333', fontFamily:'JetBrains Mono,monospace', fontSize:11, letterSpacing:2, marginBottom:8 }}>15 DAYS · RYŌGOKU KOKUGIKAN</div>
       <div style={{ color:'#555', fontSize:13, fontFamily:'Noto Serif JP,serif', marginBottom:12, lineHeight:1.6 }}>
@@ -1656,9 +1689,26 @@ export default function App() {
                 END BASHO — SEE RESULTS
               </button>
             ) : (
-              <button onClick={advanceDay} style={{ width:'100%', marginTop:8, background:'#12122a', border:`1px solid ${GOLD}`, color:GOLD, borderRadius:12, padding:'14px', fontFamily:'JetBrains Mono,monospace', fontSize:13, fontWeight:700, cursor:'pointer', letterSpacing:2 }}>
-                DAY {basho.currentDay + 1} TOMOROW →
-              </button>
+              <>
+                <button onClick={advanceDay} style={{ width:'100%', marginTop:8, background:'#12122a', border:`1px solid ${GOLD}`, color:GOLD, borderRadius:12, padding:'14px', fontFamily:'JetBrains Mono,monospace', fontSize:13, fontWeight:700, cursor:'pointer', letterSpacing:2 }}>
+                  DAY {basho.currentDay + 1} — TOMORROW →
+                </button>
+                {/* Tomorrow's matchup preview */}
+                <div style={{ marginTop:10, padding:'10px 12px', background:'#0a0a14', borderRadius:8, border:'1px solid #14142a' }}>
+                  <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, marginBottom:8 }}>TOMORROW'S MATCHUPS — DAY {basho.currentDay + 1}</div>
+                  {basho.enteredWrestlers.map(w => {
+                    const nextEntry = basho.schedule[w.id][basho.currentDay];
+                    if (!nextEntry) return null;
+                    return (
+                      <div key={w.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', borderBottom:'1px solid #0f0f20' }}>
+                        <span style={{ color:'#6060a0', fontFamily:'Noto Serif JP,serif', fontSize:11 }}>{w.name}</span>
+                        <span style={{ color:'#2a2a40', fontFamily:'JetBrains Mono,monospace', fontSize:9 }}>対</span>
+                        <span style={{ color:'#4a3030', fontFamily:'Noto Serif JP,serif', fontSize:11 }}>{nextEntry.opp.name} <span style={{ color:'#2a2a40', fontSize:9 }}>({nextEntry.opp.rank})</span></span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )
           )}
         </div>
