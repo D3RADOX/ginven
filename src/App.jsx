@@ -315,7 +315,7 @@ function segaWrestler(ctx, cx, groundY, side, pose, skin, belt) {
   ctx.restore(); // flip
 }
 
-function renderBoutFrame(ctx, W, H, phase, x1, x2, names) {
+function renderBoutFrame(ctx, W, H, phase, x1, x2, names, t = 1) {
   const GY = H - 28;
   const pn = phase.name; // phase name for effects
 
@@ -433,21 +433,23 @@ function renderBoutFrame(ctx, W, H, phase, x1, x2, names) {
 
   // ── PHASE EFFECTS (drawn before wrestlers) ──────────────────
 
-  // Tachiai: dust burst from feet
-  if (pn === 'Tachiai') {
+  // Tachiai: animated dust burst from feet (scales with t)
+  if (pn === 'Tachiai' && t > 0) {
     const dustCols = ['#c8a060','#b89050','#a07840'];
     for (let side = 0; side < 2; side++) {
       const bx = side === 0 ? x1 : x2;
       const dir = side === 0 ? 1 : -1;
-      for (let d = 0; d < 8; d++) {
-        const angle = (d / 8) * Math.PI + (dir > 0 ? 0 : Math.PI);
-        const dist = 8 + (d % 3) * 6;
-        const dx = bx + Math.cos(angle) * dist;
-        const dy = GY + Math.sin(angle) * dist * 0.4;
+      for (let d = 0; d < 10; d++) {
+        const angle = (d / 10) * Math.PI + (dir > 0 ? 0 : Math.PI);
+        const speed = 10 + (d % 3) * 8;
+        const dx = bx + Math.cos(angle) * speed * t;
+        const dy = GY - Math.abs(Math.sin(angle)) * speed * 0.5 * t
+                      + t * t * speed * 0.7; // arc + gravity
+        const alpha = Math.max(0, (0.7 - t * 0.75) - d * 0.02);
         ctx.fillStyle = dustCols[d % 3];
-        ctx.globalAlpha = 0.55 - d * 0.05;
+        ctx.globalAlpha = alpha;
         ctx.beginPath();
-        ctx.arc(dx, dy, 2 + (d % 3), 0, Math.PI * 2);
+        ctx.arc(dx, dy, 2.5 + (d % 3) * 0.8, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -486,20 +488,50 @@ function renderBoutFrame(ctx, W, H, phase, x1, x2, names) {
 
   // ── POST-WRESTLER EFFECTS ────────────────────────────────────
 
-  // Finish: starburst on winner, elongated shadow on loser
+  // Finish: animated starburst + confetti on winner, elongated shadow on loser
   if (pn === 'Finish') {
     const winX = phase.winner === 'w1' ? x1 : x2;
     const losX = phase.winner === 'w1' ? x2 : x1;
-    // Gold starburst
-    ctx.strokeStyle = 'rgba(200,160,40,0.55)'; ctx.lineWidth = 1.5;
-    for (let r = 0; r < 8; r++) {
-      const a = (r / 8) * Math.PI * 2;
-      const len = 18 + (r % 3) * 8;
+
+    // Animated starburst — rays grow with t
+    const burstAlpha = Math.min(0.75, t * 1.1);
+    const rays = 12;
+    ctx.lineWidth = 1.8;
+    for (let r = 0; r < rays; r++) {
+      const a    = (r / rays) * Math.PI * 2;
+      const r1   = 6;
+      const r2   = (18 + (r % 4) * 12) * Math.min(1, t * 1.6);
+      ctx.strokeStyle = r % 2 === 0
+        ? `rgba(220,180,40,${burstAlpha * 0.85})`
+        : `rgba(255,220,100,${burstAlpha * 0.5})`;
       ctx.beginPath();
-      ctx.moveTo(winX + Math.cos(a) * 6, GY - 52 + Math.sin(a) * 6);
-      ctx.lineTo(winX + Math.cos(a) * len, GY - 52 + Math.sin(a) * len);
+      ctx.moveTo(winX + Math.cos(a) * r1, GY - 52 + Math.sin(a) * r1);
+      ctx.lineTo(winX + Math.cos(a) * r2, GY - 52 + Math.sin(a) * r2);
       ctx.stroke();
     }
+
+    // Confetti rain — starts at t > 0.35
+    if (t > 0.35) {
+      const cf_t  = (t - 0.35) / 0.65; // 0→1 over second half
+      const CONF_COLS = ['#c9a84c','#44cc66','#e84040','#4a88cc','#e8a840','#cc44aa'];
+      for (let i = 0; i < 16; i++) {
+        const startX = winX + ((i % 8) - 3.5) * 13;
+        const cx     = startX + Math.sin(i * 1.7 + cf_t * 2.5) * 16 * cf_t;
+        const cy     = (GY - 85) + cf_t * cf_t * 130 * (0.5 + (i % 3) * 0.3);
+        const rot    = i * 0.55 + cf_t * 4;
+        const alpha  = Math.max(0, 0.95 - cf_t * 1.1);
+        if (alpha <= 0) continue;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rot);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = CONF_COLS[i % CONF_COLS.length];
+        ctx.fillRect(-3.5, -2, 7, 4);
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+    }
+
     // Loser elongated fall shadow
     ctx.fillStyle = 'rgba(0,0,0,0.32)';
     ctx.beginPath();
@@ -507,12 +539,20 @@ function renderBoutFrame(ctx, W, H, phase, x1, x2, names) {
     ctx.fill();
   }
 
-  // Tachiai / Finish: screen flash overlay
-  if (pn === 'Tachiai' || pn === 'Finish') {
-    ctx.fillStyle = pn === 'Finish'
-      ? 'rgba(255,240,180,0.10)'
-      : 'rgba(255,255,220,0.07)';
-    ctx.fillRect(0, 0, W, H);
+  // Tachiai / Finish: animated screen flash (bell-shaped pulse via t)
+  if ((pn === 'Tachiai' || pn === 'Finish') && t > 0 && t < 1) {
+    const flashAlpha = pn === 'Finish'
+      ? Math.max(0, 0.22 * Math.sin(t * Math.PI))
+      : Math.max(0, 0.14 * Math.sin(t * Math.PI));
+    if (flashAlpha > 0) {
+      const midX = (x1 + x2) / 2;
+      const flash = ctx.createRadialGradient(midX, GY - 40, 4, midX, GY - 40, 80);
+      flash.addColorStop(0,   `rgba(255,255,210,${flashAlpha})`);
+      flash.addColorStop(0.5, `rgba(255,230,130,${flashAlpha * 0.5})`);
+      flash.addColorStop(1,   'rgba(255,210,60,0)');
+      ctx.fillStyle = flash;
+      ctx.fillRect(0, 0, W, H);
+    }
   }
 
   // ── NAME TAGS (Sega fighter style) ──────────────────────────
@@ -565,7 +605,7 @@ function BoutCanvas({ phases, currentPhase, names }) {
       const x1 = sX1 + (tX1 - sX1) * e;
       const x2 = sX2 + (tX2 - sX2) * e;
       posRef.current = { x1, x2 };
-      renderBoutFrame(ctx, W, H, cur, x1, x2, names);
+      renderBoutFrame(ctx, W, H, cur, x1, x2, names, t);
       if (t < 1) rafRef.current = requestAnimationFrame(tick);
     };
 
@@ -821,7 +861,19 @@ export default function App() {
   const [selW, setSelW]         = useState(null);
   const [viewer, setViewer]     = useState(null);
   const [basho, setBasho]       = useState(null);
-  const eventId = useRef(3);
+  const eventId    = useRef(3);
+  const prevFunds  = useRef(stable.funds);
+  const [fundsFlash, setFundsFlash] = useState(null); // 'up' | 'down' | null
+
+  useEffect(() => {
+    const prev = prevFunds.current;
+    if (prev !== stable.funds) {
+      setFundsFlash(stable.funds > prev ? 'up' : 'down');
+      const t = setTimeout(() => setFundsFlash(null), 900);
+      prevFunds.current = stable.funds;
+      return () => clearTimeout(t);
+    }
+  }, [stable.funds]);
 
   const pushEvent = (type, text) => {
     setEvents(ev => [{ id: eventId.current++, type, text }, ...ev.slice(0, 11)]);
@@ -1279,7 +1331,7 @@ export default function App() {
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
             <div style={{ textAlign:'right' }}>
-              <div style={{ color:GOLD, fontSize:13, fontWeight:700, fontFamily:'JetBrains Mono,monospace' }}>¥{(stable.funds/1000).toFixed(0)}k</div>
+              <div style={{ color: fundsFlash === 'up' ? '#44cc66' : fundsFlash === 'down' ? '#e84040' : GOLD, fontSize:13, fontWeight:700, fontFamily:'JetBrains Mono,monospace', transition:'color 0.15s' }}>¥{(stable.funds/1000).toFixed(0)}k</div>
               <div style={{ color:'#282848', fontSize:9, fontFamily:'JetBrains Mono,monospace', letterSpacing:1 }}>FUNDS</div>
             </div>
             <button onClick={advance} style={{ background:GOLD, color:'#0a0a0f', border:'none', borderRadius:8, padding:'8px 13px', fontFamily:'JetBrains Mono,monospace', fontSize:10, fontWeight:700, cursor:'pointer', letterSpacing:1, whiteSpace:'nowrap' }}>
