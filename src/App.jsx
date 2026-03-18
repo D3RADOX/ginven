@@ -202,23 +202,42 @@ function segaWrestler(ctx, cx, groundY, side, pose, skin, belt) {
   const HEAD_CY = -74 + tY;
   const SHLDR_Y = -54 + tY;
 
-  // Draw a limb: origin at (ox, oy), pivoted from top-centre
+  // Draw a limb with highlight shading
   const limb = (ox, oy, w, h, angleDeg) => {
     ctx.save();
     ctx.translate(ox, oy);
     ctx.rotate(angleDeg * Math.PI / 180);
+    // Outline
     ctx.fillStyle = OL;
     rrect(ctx, -w / 2 - 1.5, -1.5, w + 3, h + 3, 5);
     ctx.fill();
+    // Skin fill
     ctx.fillStyle = skin;
     rrect(ctx, -w / 2, 0, w, h, 4);
     ctx.fill();
+    // Highlight strip (lit side)
+    ctx.fillStyle = 'rgba(255,255,255,0.10)';
+    rrect(ctx, -w / 2, 0, w * 0.45, h * 0.6, 4);
+    ctx.fill();
+    // End cap (hand/foot)
+    const capR = w * 0.52;
+    ctx.fillStyle = OL;
+    ctx.beginPath(); ctx.arc(0, h + capR * 0.4, capR + 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = skin;
+    ctx.beginPath(); ctx.arc(0, h + capR * 0.4, capR, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   };
 
   ctx.save();
   ctx.translate(cx, groundY);
   ctx.scale(flip, 1);
+
+  // Ground shadow — ellipse at feet, wider when leaning forward
+  const shadowW = 34 + Math.abs(lean) * 0.3;
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.beginPath();
+  ctx.ellipse(0, 4, shadowW, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
 
   // Body lean pivots around hip centre
   ctx.save();
@@ -234,14 +253,24 @@ function segaWrestler(ctx, cx, groundY, side, pose, skin, belt) {
   rrect(ctx, -18, TORSO_T - 1.5, 38, 41, 9); ctx.fill();
   ctx.fillStyle = skin;
   rrect(ctx, -16.5, TORSO_T, 35, 38, 8);     ctx.fill();
+  // Torso highlight (upper-left lit area)
+  ctx.fillStyle = 'rgba(255,255,255,0.09)';
+  rrect(ctx, -16.5, TORSO_T, 20, 18, 8);     ctx.fill();
+  // Torso muscle definition lines
+  ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(-8, TORSO_T + 10); ctx.lineTo(-8, TORSO_T + 28); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo( 8, TORSO_T + 10); ctx.lineTo( 8, TORSO_T + 28); ctx.stroke();
 
   // Mawashi belt
   ctx.fillStyle = OL;
   rrect(ctx, -20, BELT_T - 1.5, 42, 18, 5);  ctx.fill();
   ctx.fillStyle = belt;
   rrect(ctx, -18.5, BELT_T, 39, 16, 4);      ctx.fill();
+  // Belt top-edge sheen
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  rrect(ctx, -18.5, BELT_T, 39, 4, 4);       ctx.fill();
   // Knot highlight
-  ctx.fillStyle = 'rgba(255,255,255,0.14)';
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
   rrect(ctx, -5, BELT_T + 3, 10, 9, 3);      ctx.fill();
 
   // Right arm (front)
@@ -257,15 +286,25 @@ function segaWrestler(ctx, cx, groundY, side, pose, skin, belt) {
   ctx.beginPath(); ctx.ellipse(0, HEAD_CY, 18, 16, 0, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = skin;
   ctx.beginPath(); ctx.ellipse(0, HEAD_CY, 16.5, 14.5, 0, 0, Math.PI * 2); ctx.fill();
+  // Head highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.10)';
+  ctx.beginPath(); ctx.ellipse(-4, HEAD_CY - 4, 8, 6, -0.4, 0, Math.PI * 2); ctx.fill();
 
   // Topknot
   ctx.fillStyle = '#120810';
   ctx.beginPath(); ctx.ellipse(0, HEAD_CY - 12, 6, 10, 0, 0, Math.PI * 2); ctx.fill();
+  // Topknot sheen
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.beginPath(); ctx.ellipse(-1, HEAD_CY - 14, 2.5, 4, -0.3, 0, Math.PI * 2); ctx.fill();
 
   // Eyes
   ctx.fillStyle = '#0a0808';
   ctx.beginPath(); ctx.ellipse(-6, HEAD_CY + 1, 3.5, 3, 0, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.ellipse( 6, HEAD_CY + 1, 3.5, 3, 0, 0, Math.PI * 2); ctx.fill();
+  // Eye glint
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.beginPath(); ctx.arc(-5, HEAD_CY - 0.5, 1, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc( 7, HEAD_CY - 0.5, 1, 0, Math.PI * 2); ctx.fill();
 
   // Brows (intensity expression)
   ctx.strokeStyle = '#0a0808'; ctx.lineWidth = 2.5;
@@ -276,8 +315,9 @@ function segaWrestler(ctx, cx, groundY, side, pose, skin, belt) {
   ctx.restore(); // flip
 }
 
-function renderBoutFrame(ctx, W, H, phase, x1, x2) {
+function renderBoutFrame(ctx, W, H, phase, x1, x2, names) {
   const GY = H - 28;
+  const pn = phase.name; // phase name for effects
 
   // Sky gradient
   const sky = ctx.createLinearGradient(0, 0, 0, H);
@@ -287,20 +327,29 @@ function renderBoutFrame(ctx, W, H, phase, x1, x2) {
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, W, H);
 
-  // Crowd silhouettes — 4 rows
+  // Crowd silhouettes — 4 rows with occasional accent spectators
   const crowdPalette = ['#1a0d30','#140924','#1c0c1c','#18101e'];
   for (let row = 0; row < 4; row++) {
     const ry = 6 + row * 18;
     const count = 18 + row * 4;
     for (let i = 0; i < count; i++) {
+      const seed = (i * 7 + row * 13) % 32;
       const hx = (i * (W / count)) + (row % 2) * (W / count / 2);
       const hw = 10 + (i % 3) * 3;
       const hh = 14 + (i % 4) * 3;
-      ctx.fillStyle = crowdPalette[(i + row) % 4];
+      // 1-in-8 chance of accent spectator (standing out, waving)
+      const isAccent = seed % 8 === 0;
+      ctx.fillStyle = isAccent
+        ? (seed % 2 === 0 ? '#3a1a5a' : '#1a3a1a')
+        : crowdPalette[(i + row) % 4];
       ctx.fillRect(hx + 1, ry + hh * 0.42, hw - 2, hh * 0.62);
       ctx.beginPath();
       ctx.ellipse(hx + hw / 2, ry + hh * 0.28, hw * 0.38, hh * 0.3, 0, 0, Math.PI * 2);
       ctx.fill();
+      // Accent: raised arm
+      if (isAccent) {
+        ctx.fillRect(hx + hw * 0.6, ry + hh * 0.05, hw * 0.18, hh * 0.38);
+      }
     }
   }
 
@@ -333,6 +382,16 @@ function renderBoutFrame(ctx, W, H, phase, x1, x2) {
   ctx.ellipse(W / 2, GY + 6, W * 0.44, 36, 0, 0, Math.PI * 2);
   ctx.fill();
 
+  // Arena spotlight — radial glow on dohyo surface
+  const spot = ctx.createRadialGradient(W / 2, GY - 10, 8, W / 2, GY - 10, 180);
+  spot.addColorStop(0,   'rgba(255,240,200,0.09)');
+  spot.addColorStop(0.5, 'rgba(255,230,160,0.04)');
+  spot.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = spot;
+  ctx.beginPath();
+  ctx.ellipse(W / 2, GY + 6, W * 0.44, 36, 0, 0, Math.PI * 2);
+  ctx.fill();
+
   // Tawara straw boundary
   ctx.strokeStyle = '#6a3818'; ctx.lineWidth = 10;
   ctx.beginPath();
@@ -348,12 +407,22 @@ function renderBoutFrame(ctx, W, H, phase, x1, x2) {
     ctx.fill();
   }
 
+  // Inner dohyo chalk circle (traditional marking, dashed)
+  ctx.save();
+  ctx.setLineDash([4, 6]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.055)'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.ellipse(W / 2, GY + 6, W * 0.35, 28, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
   // Shikiri lines
   ctx.fillStyle = '#2a1414';
   ctx.fillRect(W / 2 - 30, GY - 28, 5, 22);
   ctx.fillRect(W / 2 + 25, GY - 28, 5, 22);
 
-  // Gyōji (referee) — simple geometric figure
+  // Gyōji (referee)
   const gx = W / 2 + 64, gy = GY - 48;
   ctx.fillStyle = '#d8a860';
   ctx.beginPath(); ctx.arc(gx, gy, 5.5, 0, Math.PI * 2); ctx.fill();
@@ -362,16 +431,116 @@ function renderBoutFrame(ctx, W, H, phase, x1, x2) {
   ctx.fillStyle = '#c83800';
   ctx.fillRect(gx - 12, gy + 10, 22, 3);
 
+  // ── PHASE EFFECTS (drawn before wrestlers) ──────────────────
+
+  // Tachiai: dust burst from feet
+  if (pn === 'Tachiai') {
+    const dustCols = ['#c8a060','#b89050','#a07840'];
+    for (let side = 0; side < 2; side++) {
+      const bx = side === 0 ? x1 : x2;
+      const dir = side === 0 ? 1 : -1;
+      for (let d = 0; d < 8; d++) {
+        const angle = (d / 8) * Math.PI + (dir > 0 ? 0 : Math.PI);
+        const dist = 8 + (d % 3) * 6;
+        const dx = bx + Math.cos(angle) * dist;
+        const dy = GY + Math.sin(angle) * dist * 0.4;
+        ctx.fillStyle = dustCols[d % 3];
+        ctx.globalAlpha = 0.55 - d * 0.05;
+        ctx.beginPath();
+        ctx.arc(dx, dy, 2 + (d % 3), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Push: motion lines behind retreating wrestler
+  if (pn === 'Push & Position') {
+    const retX = phase.adv === 'w1' ? x2 : x1;
+    const dir   = phase.adv === 'w1' ? 1 : -1;
+    ctx.strokeStyle = 'rgba(180,140,80,0.16)'; ctx.lineWidth = 1.5;
+    for (let l = 0; l < 3; l++) {
+      const ly = GY - 30 - l * 16;
+      ctx.beginPath();
+      ctx.moveTo(retX + dir * 14, ly);
+      ctx.lineTo(retX + dir * 38, ly);
+      ctx.stroke();
+    }
+  }
+
+  // Grip: pressure dots at contact zone
+  if (pn === 'Grip Battle') {
+    const mx = (x1 + x2) / 2;
+    ctx.fillStyle = 'rgba(220,200,160,0.35)';
+    for (let d = 0; d < 5; d++) {
+      const angle = (d / 5) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(mx + Math.cos(angle) * 6, GY - 38 + Math.sin(angle) * 8, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   // Wrestlers
   segaWrestler(ctx, x1, GY, 'left',  phase.pose1, '#c9a040', '#183acc');
   segaWrestler(ctx, x2, GY, 'right', phase.pose2, '#d03028', '#101010');
+
+  // ── POST-WRESTLER EFFECTS ────────────────────────────────────
+
+  // Finish: starburst on winner, elongated shadow on loser
+  if (pn === 'Finish') {
+    const winX = phase.winner === 'w1' ? x1 : x2;
+    const losX = phase.winner === 'w1' ? x2 : x1;
+    // Gold starburst
+    ctx.strokeStyle = 'rgba(200,160,40,0.55)'; ctx.lineWidth = 1.5;
+    for (let r = 0; r < 8; r++) {
+      const a = (r / 8) * Math.PI * 2;
+      const len = 18 + (r % 3) * 8;
+      ctx.beginPath();
+      ctx.moveTo(winX + Math.cos(a) * 6, GY - 52 + Math.sin(a) * 6);
+      ctx.lineTo(winX + Math.cos(a) * len, GY - 52 + Math.sin(a) * len);
+      ctx.stroke();
+    }
+    // Loser elongated fall shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.32)';
+    ctx.beginPath();
+    ctx.ellipse(losX, GY + 6, 44, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Tachiai / Finish: screen flash overlay
+  if (pn === 'Tachiai' || pn === 'Finish') {
+    ctx.fillStyle = pn === 'Finish'
+      ? 'rgba(255,240,180,0.10)'
+      : 'rgba(255,255,220,0.07)';
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // ── NAME TAGS (Sega fighter style) ──────────────────────────
+  if (names) {
+    const drawTag = (nx, label, accentColor) => {
+      ctx.font = 'bold 9px JetBrains Mono, monospace';
+      const tw = ctx.measureText(label).width;
+      const pw = tw + 14, ph = 14, px = nx - pw / 2, py = GY + 12;
+      // Pill background
+      ctx.fillStyle = 'rgba(0,0,0,0.60)';
+      rrect(ctx, px, py, pw, ph, 5); ctx.fill();
+      // Accent underline
+      ctx.fillStyle = accentColor;
+      rrect(ctx, px, py + ph - 2, pw, 2, 2); ctx.fill();
+      // Text
+      ctx.fillStyle = '#e8e0c0';
+      ctx.fillText(label, nx - tw / 2, py + 10);
+    };
+    drawTag(x1, (names.n1 || '').slice(0, 10), 'rgba(200,168,60,0.8)');
+    drawTag(x2, (names.n2 || '').slice(0, 10), 'rgba(210,60,50,0.8)');
+  }
 
   // Scanlines
   ctx.fillStyle = 'rgba(0,0,0,0.028)';
   for (let y = 0; y < H; y += 2) ctx.fillRect(0, y, W, 1);
 }
 
-function BoutCanvas({ phases, currentPhase }) {
+function BoutCanvas({ phases, currentPhase, names }) {
   const cvRef  = useRef(null);
   const posRef = useRef(null);
   const rafRef = useRef(null);
@@ -396,13 +565,13 @@ function BoutCanvas({ phases, currentPhase }) {
       const x1 = sX1 + (tX1 - sX1) * e;
       const x2 = sX2 + (tX2 - sX2) * e;
       posRef.current = { x1, x2 };
-      renderBoutFrame(ctx, W, H, cur, x1, x2);
+      renderBoutFrame(ctx, W, H, cur, x1, x2, names);
       if (t < 1) rafRef.current = requestAnimationFrame(tick);
     };
 
     rafRef.current = requestAnimationFrame(tick);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [currentPhase, phases]);
+  }, [currentPhase, phases, names]);
 
   return (
     <canvas
@@ -462,7 +631,7 @@ function FightViewer({ bout, onClose }) {
       </div>
 
       {/* Arena — Sega-style 2D Canvas */}
-      <BoutCanvas phases={bout.phases} currentPhase={phase} />
+      <BoutCanvas phases={bout.phases} currentPhase={phase} names={{ n1: bout.w1.name, n2: bout.w2.name }} />
 
       {/* Phase progress dots */}
       <div style={{ display:'flex', gap:6, padding:'14px 0 6px' }}>
@@ -517,28 +686,103 @@ function FightViewer({ bout, onClose }) {
 // ─────────────────────────────────────────────────────────────────
 const GOLD = '#c9a84c', RED = '#e84040', GREEN = '#44cc66', ORANGE = '#e8a840';
 
+const PERSONALITY_COLORS = {
+  'Workhorse':          '#4a8a4a',
+  'Lazy Talent':        '#8a5a8a',
+  'Hothead':            '#cc4422',
+  'Natural Leader':     '#c9a84c',
+  'Fragile Confidence': '#6688cc',
+  'Silent Grinder':     '#448888',
+  'Showboat':           '#cc7722',
+  'Stoic':              '#888888',
+};
+
+// Rank badge: shape ('circle'|'diamond'|'square'), color, kanji
+const RANK_BADGE = {
+  'Yokozuna':   { color: '#c9a84c', shape: 'circle'  },
+  'Ozeki':      { color: '#c9a84c', shape: 'diamond' },
+  'Sekiwake':   { color: '#8888cc', shape: 'diamond' },
+  'Komusubi':   { color: '#8888cc', shape: 'square'  },
+  'Maegashira': { color: '#6688aa', shape: 'square'  },
+  'Juryo':      { color: '#888888', shape: 'square'  },
+  'Makushita':  { color: '#555568', shape: 'square'  },
+};
+
+function rankBadge(rank) {
+  const key = Object.keys(RANK_BADGE).find(k => rank.startsWith(k));
+  return key ? RANK_BADGE[key] : RANK_BADGE['Makushita'];
+}
+
+function RankBadge({ rank, size = 18 }) {
+  const b = rankBadge(rank);
+  const inner = size - 4;
+  const shared = {
+    width: inner, height: inner,
+    background: b.color,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  };
+  if (b.shape === 'circle') {
+    shared.borderRadius = '50%';
+  } else if (b.shape === 'diamond') {
+    shared.transform = 'rotate(45deg)';
+    shared.borderRadius = 2;
+    shared.width = inner * 0.78;
+    shared.height = inner * 0.78;
+  } else {
+    shared.borderRadius = 2;
+  }
+  return (
+    <div style={{ width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <div style={shared} />
+    </div>
+  );
+}
+
 function StatBar({ val, max = 99 }) {
   const pct = (val / max) * 100;
-  const col = val > 75 ? GOLD : val > 50 ? '#4a88cc' : '#555';
+  const grad = val > 90
+    ? 'linear-gradient(90deg,#9a7010,#c9a84c)'
+    : val > 75
+    ? 'linear-gradient(90deg,#7a5a10,#b8902c)'
+    : val > 50
+    ? 'linear-gradient(90deg,#2a4a7a,#4a88cc)'
+    : 'linear-gradient(90deg,#1e2e4a,#3a4a6a)';
+  const glow = val > 90 ? '0 0 6px rgba(200,168,76,0.5)' : 'none';
   return (
-    <div style={{ height:4, background:'#1a1a2e', borderRadius:2, flex:1 }}>
-      <div style={{ height:'100%', width:`${pct}%`, background:col, borderRadius:2, transition:'width 0.3s' }} />
+    <div style={{ height:4, background:'#12122a', borderRadius:2, flex:1, position:'relative' }}>
+      <div style={{ height:'100%', width:`${pct}%`, background:grad, borderRadius:2, transition:'width 0.3s', boxShadow:glow }} />
+      {/* Tick marks at 25/50/75 */}
+      {[25, 50, 75].map(t => (
+        <div key={t} style={{ position:'absolute', top:0, left:`${t}%`, width:1, height:'100%', background:'rgba(255,255,255,0.06)' }} />
+      ))}
     </div>
   );
 }
 
 function CondBar({ stat, val }) {
-  const col = stat === 'fatigue'
+  const isFatigue = stat === 'fatigue';
+  const col = isFatigue
     ? (val > 70 ? RED : val > 40 ? ORANGE : GREEN)
     : (val > 70 ? GREEN : val > 40 ? ORANGE : RED);
+  const grad = isFatigue
+    ? (val > 70 ? `linear-gradient(90deg,#8a1818,${RED})` : val > 40 ? `linear-gradient(90deg,#7a4010,${ORANGE})` : `linear-gradient(90deg,#206030,${GREEN})`)
+    : (val > 70 ? `linear-gradient(90deg,#206030,${GREEN})` : val > 40 ? `linear-gradient(90deg,#7a4010,${ORANGE})` : `linear-gradient(90deg,#8a1818,${RED})`);
+  const icon = isFatigue ? '▲' : stat === 'morale' ? '◆' : '⬡';
+  const critFatigue = isFatigue && val > 75;
   return (
     <div style={{ marginBottom:8 }}>
       <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
-        <span style={{ color:'#555', fontSize:11, fontFamily:'JetBrains Mono,monospace', textTransform:'capitalize' }}>{stat}</span>
+        <span style={{ color:'#555', fontSize:11, fontFamily:'JetBrains Mono,monospace', textTransform:'capitalize', display:'flex', alignItems:'center', gap:4 }}>
+          <span style={{ color: col, fontSize:8, opacity:0.7 }}>{icon}</span>{stat}
+        </span>
         <span style={{ color:col, fontSize:11, fontFamily:'JetBrains Mono,monospace', fontWeight:700 }}>{Math.round(val)}</span>
       </div>
-      <div style={{ height:5, background:'#1a1a2e', borderRadius:3 }}>
-        <div style={{ height:'100%', width:`${val}%`, background:col, borderRadius:3, transition:'width 0.35s' }} />
+      <div style={{ height:5, background:'#12122a', borderRadius:3, position:'relative', outline: critFatigue ? '1px solid rgba(232,64,64,0.35)' : 'none' }}>
+        <div style={{ height:'100%', width:`${val}%`, background:grad, borderRadius:3, transition:'width 0.35s' }} />
+        {[25, 50, 75].map(t => (
+          <div key={t} style={{ position:'absolute', top:0, left:`${t}%`, width:1, height:'100%', background:'rgba(255,255,255,0.07)' }} />
+        ))}
       </div>
     </div>
   );
@@ -551,7 +795,10 @@ function Card({ children, style }) {
 function Section({ label, children }) {
   return (
     <div style={{ marginBottom:4 }}>
-      <div style={{ color:'#343456', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, padding:'16px 16px 8px' }}>{label}</div>
+      <div style={{ display:'flex', alignItems:'center', gap:8, padding:'16px 16px 8px' }}>
+        <div style={{ width:2, height:14, background:'linear-gradient(180deg,#c9a84c,rgba(200,168,76,0))', borderRadius:1, flexShrink:0 }} />
+        <span style={{ color:'#454568', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3 }}>{label}</span>
+      </div>
       {children}
     </div>
   );
@@ -763,7 +1010,10 @@ export default function App() {
       <button onClick={() => setSelW(null)} style={{ background:'none', border:'none', color:GOLD, fontFamily:'JetBrains Mono,monospace', fontSize:12, cursor:'pointer', padding:'14px 16px', letterSpacing:2 }}>← ROSTER</button>
       <div style={{ textAlign:'center', padding:'0 16px 16px' }}>
         <div style={{ color:'#f0f0ff', fontSize:22, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{selW.name}</div>
-        <div style={{ color:'#333', fontSize:11, fontFamily:'JetBrains Mono,monospace', marginTop:4 }}>{selW.rank} · Age {selW.age}</div>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginTop:4 }}>
+          <RankBadge rank={selW.rank} size={16} />
+          <span style={{ color:'#444', fontSize:11, fontFamily:'JetBrains Mono,monospace' }}>{selW.rank} · Age {selW.age}</span>
+        </div>
         {selW.injured && <div style={{ color:RED, fontSize:11, fontFamily:'JetBrains Mono,monospace', marginTop:4 }}>⚠ INJURED — {selW.injuryDays} sessions remaining</div>}
       </div>
       <Section label="BASE STATS">
@@ -789,7 +1039,13 @@ export default function App() {
       <Section label="PROFILE">
         <Card style={{ margin:'0 16px', padding:'14px' }}>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:12 }}>
-            <div><div style={{ color:'#2e2e50', fontSize:9, letterSpacing:2, marginBottom:3 }}>PERSONALITY</div><div style={{ color:GOLD, fontFamily:'Noto Serif JP,serif', fontSize:14 }}>{selW.personality}</div></div>
+            <div>
+              <div style={{ color:'#2e2e50', fontSize:9, letterSpacing:2, marginBottom:3 }}>PERSONALITY</div>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <div style={{ width:8, height:8, borderRadius:'50%', background: PERSONALITY_COLORS[selW.personality] || '#555', flexShrink:0 }} />
+                <span style={{ color:GOLD, fontFamily:'Noto Serif JP,serif', fontSize:14 }}>{selW.personality}</span>
+              </div>
+            </div>
             <div style={{ textAlign:'right' }}><div style={{ color:'#2e2e50', fontSize:9, letterSpacing:2, marginBottom:3 }}>KIMARITE</div><div style={{ color:GOLD, fontFamily:'Noto Serif JP,serif', fontSize:14 }}>{selW.kimarite}</div></div>
           </div>
           <div style={{ display:'flex', justifyContent:'space-between' }}>
@@ -807,12 +1063,24 @@ export default function App() {
         const eff = Math.round(calcEffective(w));
         return (
           <div key={w.id} onClick={() => setSelW(w)} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px', marginBottom:8, background:'#0d0d1c', borderRadius:12, border:`1px solid ${w.injured?'#2a1010':'#181830'}`, cursor:'pointer' }}>
-            <div style={{ width:42, height:42, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:w.injured?'#1a0808':'#12122a', border:`2px solid ${w.injured?RED:'#26266a'}`, flexShrink:0 }}>
+            <div style={{ width:42, height:42, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:w.injured?'#1a0808':'#12122a', border:`2px solid ${w.injured?RED:'#26266a'}`, flexShrink:0, position:'relative' }}>
               <span style={{ color:w.injured?RED:GOLD, fontSize:14, fontWeight:700, fontFamily:'JetBrains Mono,monospace' }}>{eff}</span>
+              {/* Personality color ring arc — top-right corner */}
+              <div style={{ position:'absolute', top:-2, right:-2, width:10, height:10, borderRadius:'50%', background: PERSONALITY_COLORS[w.personality] || '#555', border:'1.5px solid #0d0d1c' }} />
             </div>
             <div style={{ flex:1, minWidth:0 }}>
               <div style={{ color:w.injured?'#7a3030':'#d8d8f0', fontSize:14, fontFamily:'Noto Serif JP,serif', fontWeight:700, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{w.name}</div>
-              <div style={{ color:'#333', fontSize:10, fontFamily:'JetBrains Mono,monospace', marginTop:2 }}>{w.rank} · {w.personality}</div>
+              <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:2 }}>
+                <RankBadge rank={w.rank} size={14} />
+                <span style={{ color:'#444', fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>{w.rank}</span>
+              </div>
+              {/* Win/loss ratio bar */}
+              {(w.record.wins + w.record.losses) > 0 && (
+                <div style={{ display:'flex', height:2, borderRadius:1, overflow:'hidden', marginTop:4, width:'100%' }}>
+                  <div style={{ width:`${(w.record.wins / (w.record.wins + w.record.losses)) * 100}%`, background:'#2a5a2a' }} />
+                  <div style={{ flex:1, background:'#4a1a1a' }} />
+                </div>
+              )}
             </div>
             {w.injured && <div style={{ color:RED, fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>INJ</div>}
             <div style={{ color:'#282848', fontSize:18 }}>›</div>
@@ -829,7 +1097,7 @@ export default function App() {
     <div style={{ padding:'0 0 88px' }}>
       <Section label="TRAINING POLICY">
         {TRAINING_POLICIES.map(p => (
-          <div key={p.id} onClick={() => setPolicy(p.id)} style={{ margin:'0 16px 6px', padding:'12px 14px', background: policy===p.id ? '#121228' : '#0d0d1c', borderRadius:12, border:`1px solid ${policy===p.id?GOLD:'#181830'}`, cursor:'pointer' }}>
+          <div key={p.id} onClick={() => setPolicy(p.id)} style={{ margin:'0 16px 6px', padding:'12px 14px', background: policy===p.id ? '#121228' : '#0d0d1c', borderRadius:12, border:`1px solid ${policy===p.id?GOLD:'#181830'}`, cursor:'pointer', boxShadow: policy===p.id ? '0 0 0 1px rgba(200,168,76,0.2), 0 4px 16px rgba(0,0,0,0.4)' : 'none' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
               <span style={{ color: policy===p.id ? GOLD : '#9898b8', fontSize:14, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{p.name}</span>
               {policy===p.id && <span style={{ color:GOLD, fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>● ACTIVE</span>}
@@ -899,7 +1167,15 @@ export default function App() {
             ))}
           </div>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10 }}>
-            <span style={{ color: p.potential==='Elite'?GOLD:p.potential==='High'?GREEN:p.potential==='Medium'?'#4a88cc':'#555', fontSize:11, fontFamily:'JetBrains Mono,monospace', fontWeight:700 }}>◆ {p.potential.toUpperCase()}</span>
+            <span style={{
+              display:'inline-flex', alignItems:'center', gap:4,
+              padding:'3px 8px', borderRadius:10,
+              fontSize:11, fontFamily:'JetBrains Mono,monospace', fontWeight:700,
+              color: p.potential==='Elite'?GOLD:p.potential==='High'?GREEN:p.potential==='Medium'?'#4a88cc':'#555',
+              border: `1px solid ${p.potential==='Elite'?'rgba(200,168,76,0.4)':p.potential==='High'?'rgba(68,204,102,0.4)':p.potential==='Medium'?'rgba(74,136,204,0.4)':'rgba(85,85,85,0.3)'}`,
+              boxShadow: p.potential==='Elite'?'0 0 8px rgba(200,168,76,0.25)':'none',
+              background: p.potential==='Elite'?'rgba(200,168,76,0.06)':'transparent',
+            }}>◆ {p.potential.toUpperCase()}</span>
             <button onClick={() => recruit(p)} style={{ background: stable.funds>=p.cost ? GOLD : '#1e1e30', color: stable.funds>=p.cost ? '#0a0a0f' : '#333', border:'none', borderRadius:8, padding:'8px 18px', fontFamily:'JetBrains Mono,monospace', fontSize:11, fontWeight:700, cursor: stable.funds>=p.cost ? 'pointer' : 'not-allowed', letterSpacing:1 }}>
               ¥{p.cost.toLocaleString()}
             </button>
@@ -922,7 +1198,22 @@ export default function App() {
         <div style={{ color:GOLD, fontSize:16, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{basho.name}</div>
         <div style={{ color:'#333', fontFamily:'JetBrains Mono,monospace', fontSize:10, letterSpacing:2 }}>DAY {basho.day}</div>
       </div>
-      <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, marginBottom:14 }}>TAP WATCH TO VIEW · TAP RESULT TO RESOLVE</div>
+      <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, marginBottom:12 }}>TAP WATCH TO VIEW · TAP RESULT TO RESOLVE</div>
+
+      {/* W-L track */}
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14, padding:'8px 12px', background:'#0d0d1c', borderRadius:8, border:'1px solid #181830' }}>
+        <div style={{ display:'flex', gap:4 }}>
+          {basho.bouts.map(b => (
+            <div key={b.id} style={{ width:10, height:10, borderRadius:'50%', background: b.result==='win' ? GREEN : b.result==='loss' ? RED : '#282840', border:`1px solid ${b.result==='win'?'#2a5a2a':b.result==='loss'?'#5a1a1a':'#383858'}` }} />
+          ))}
+        </div>
+        <span style={{ color:GOLD, fontFamily:'JetBrains Mono,monospace', fontSize:11, fontWeight:700, marginLeft:4 }}>
+          {basho.bouts.filter(b=>b.result==='win').length}W–{basho.bouts.filter(b=>b.result==='loss').length}L
+        </span>
+        <span style={{ color:'#333', fontFamily:'JetBrains Mono,monospace', fontSize:9, marginLeft:'auto' }}>
+          {basho.bouts.filter(b=>!b.result).length} REMAINING
+        </span>
+      </div>
 
       {basho.bouts.map(b => (
         <Card key={b.id} style={{ marginBottom:10, overflow:'hidden' }}>
@@ -981,7 +1272,9 @@ export default function App() {
           <div>
             <div style={{ color:GOLD, fontSize:15, fontWeight:700, fontFamily:'Noto Serif JP,serif' }}>{stable.name}</div>
             <div style={{ color:'#282848', fontSize:9, fontFamily:'JetBrains Mono,monospace', letterSpacing:2, marginTop:1 }}>
-              {stable.year} {MONTHS[stable.month-1].toUpperCase()} {String(stable.day).padStart(2,'0')} · {stable.time.toUpperCase()}
+              {[stable.year, MONTHS[stable.month-1].toUpperCase(), String(stable.day).padStart(2,'0'), stable.time.toUpperCase()].map((seg, i) => (
+                <span key={i} style={{ padding:'1px 5px', borderRadius:3, background:'#0d0d1c', color: i === 3 ? GOLD : '#303058', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:1, marginRight:3, border:'1px solid #181836' }}>{seg}</span>
+              ))}
             </div>
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
