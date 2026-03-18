@@ -97,6 +97,32 @@ function calcEffective(w) {
   return Math.max(1, base + (c.morale - 50) * 0.15 - c.fatigue * 0.2 + c.discipline * 0.05);
 }
 
+// ─────────────────────────────────────────────────────────────────
+//  WRESTLER VISUAL IDENTITY
+// ─────────────────────────────────────────────────────────────────
+const SKIN_PALETTE = [
+  '#d4a574', '#c8906a', '#b07050', '#985840',
+  '#c4b090', '#d8c4a8', '#b09474', '#e0c8a0',
+];
+const BELT_PALETTE = {
+  'Workhorse':          '#1a6622',
+  'Lazy Talent':        '#7722aa',
+  'Hothead':            '#cc2211',
+  'Natural Leader':     '#c9a84c',
+  'Fragile Confidence': '#2266aa',
+  'Silent Grinder':     '#334466',
+  'Showboat':           '#cc5522',
+  'Stoic':              '#445588',
+};
+function wrestlerVisuals(w) {
+  if (!w) return { skin: '#c9a040', belt: '#183acc', scale: 1.0 };
+  const skin  = SKIN_PALETTE[((w.id || 0) * 17 + 7) % SKIN_PALETTE.length];
+  const belt  = BELT_PALETTE[w.personality] || '#2244aa';
+  const mass  = ((w.stats?.power || 70) + (w.stats?.stamina || 70)) / 2;
+  const scale = 0.78 + (mass / 99) * 0.44; // 0.78–1.22
+  return { skin, belt, scale };
+}
+
 const NARRATIVES = {
   shikiri:    ["The gyōji raises his fan. The dohyō falls silent.", "Both rikishi glare across the shikiri line. The crowd holds its breath.", "Ritual salt scatters across the clay. Time slows."],
   tai_even:   ["An even collision — neither gains the opening!", "Perfectly matched tachiai. This will be decided in the grip.", "Simultaneous explosion — the impact echoes through the hall."],
@@ -219,6 +245,55 @@ const CPOSES = {
   fall:     [ 52,  68,  88, -52,  52,  20],
 };
 
+function drawPortraitHead(ctx, cx, cy, skin, belt, sc) {
+  const OL = '#08060a';
+  // Head outline + fill
+  ctx.fillStyle = OL;
+  ctx.beginPath(); ctx.ellipse(cx, cy, 18*sc, 16*sc, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.ellipse(cx, cy, 16.5*sc, 14.5*sc, 0, 0, Math.PI*2); ctx.fill();
+  // Head highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.10)';
+  ctx.beginPath(); ctx.ellipse(cx - 4*sc, cy - 4*sc, 8*sc, 6*sc, -0.4, 0, Math.PI*2); ctx.fill();
+  // Topknot
+  ctx.fillStyle = '#120810';
+  ctx.beginPath(); ctx.ellipse(cx, cy - 12*sc, 6*sc, 10*sc, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.beginPath(); ctx.ellipse(cx - 1*sc, cy - 14*sc, 2.5*sc, 4*sc, -0.3, 0, Math.PI*2); ctx.fill();
+  // Eyes
+  ctx.fillStyle = OL;
+  ctx.beginPath(); ctx.ellipse(cx - 6*sc, cy + 1*sc, 3.5*sc, 3*sc, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + 6*sc, cy + 1*sc, 3.5*sc, 3*sc, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.beginPath(); ctx.arc(cx - 5*sc, cy - 0.5*sc, sc, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 7*sc, cy - 0.5*sc, sc, 0, Math.PI*2); ctx.fill();
+  // Brows (fierce)
+  ctx.strokeStyle = OL; ctx.lineWidth = 2.5*sc;
+  ctx.beginPath(); ctx.moveTo(cx - 9*sc, cy - 6*sc); ctx.lineTo(cx - 3*sc, cy - 4*sc); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx + 9*sc, cy - 6*sc); ctx.lineTo(cx + 3*sc, cy - 4*sc); ctx.stroke();
+  // Shoulders outline
+  ctx.fillStyle = OL;
+  ctx.beginPath();
+  ctx.moveTo(cx - 16*sc, cy + 18*sc); ctx.lineTo(cx + 16*sc, cy + 18*sc);
+  ctx.lineTo(cx + 25*sc, cy + 38*sc); ctx.lineTo(cx - 25*sc, cy + 38*sc);
+  ctx.closePath(); ctx.fill();
+  // Shoulders skin
+  ctx.fillStyle = skin;
+  ctx.beginPath();
+  ctx.moveTo(cx - 14*sc, cy + 18*sc); ctx.lineTo(cx + 14*sc, cy + 18*sc);
+  ctx.lineTo(cx + 23*sc, cy + 36*sc); ctx.lineTo(cx - 23*sc, cy + 36*sc);
+  ctx.closePath(); ctx.fill();
+  // Belt stripe hint
+  ctx.fillStyle = belt;
+  ctx.fillRect(cx - 22*sc, cy + 28*sc, 44*sc, 7*sc);
+  // Shoulder highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.07)';
+  ctx.beginPath();
+  ctx.moveTo(cx - 14*sc, cy + 18*sc); ctx.lineTo(cx + 14*sc, cy + 18*sc);
+  ctx.lineTo(cx + 18*sc, cy + 26*sc); ctx.lineTo(cx - 18*sc, cy + 26*sc);
+  ctx.closePath(); ctx.fill();
+}
+
 function rrect(ctx, x, y, w, h, r) {
   r = Math.min(r, w / 2, h / 2);
   ctx.beginPath();
@@ -230,9 +305,13 @@ function rrect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-function segaWrestler(ctx, cx, groundY, side, pose, skin, belt) {
+function segaWrestler(ctx, cx, groundY, side, pose, skin, belt,
+                      scale = 1.0, fromPose = null, poseT = 1.0, isLoser = false) {
   const pc = CPOSES[pose] || CPOSES.ready;
-  const [lean, lA, rA, lL, rL, tY] = pc;
+  const fp = CPOSES[fromPose] || pc;
+  const lerpVal = (a, b, t) => a + (b - a) * t;
+  const pt = Math.pow(Math.max(0, Math.min(1, poseT)), 0.65);
+  const [lean, lA, rA, lL, rL, tY] = pc.map((v, i) => lerpVal(fp[i], v, pt));
   const OL   = '#08060a';
   const flip = side === 'right' ? -1 : 1;
 
@@ -271,7 +350,7 @@ function segaWrestler(ctx, cx, groundY, side, pose, skin, belt) {
 
   ctx.save();
   ctx.translate(cx, groundY);
-  ctx.scale(flip, 1);
+  ctx.scale(flip * scale, scale);
 
   // Ground shadow — ellipse at feet, wider when leaning forward
   const shadowW = 34 + Math.abs(lean) * 0.3;
@@ -347,18 +426,23 @@ function segaWrestler(ctx, cx, groundY, side, pose, skin, belt) {
   ctx.beginPath(); ctx.arc(-5, HEAD_CY - 0.5, 1, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.arc( 7, HEAD_CY - 0.5, 1, 0, Math.PI * 2); ctx.fill();
 
-  // Brows (intensity expression)
+  // Brows — expression changes based on advantage state
+  const strain = isLoser ? 5 : 0;    // raised when losing (strain/desperation)
+  const scowl  = isLoser ? -2 : 0;   // inner end adjustment
   ctx.strokeStyle = '#0a0808'; ctx.lineWidth = 2.5;
-  ctx.beginPath(); ctx.moveTo(-9, HEAD_CY - 6); ctx.lineTo(-3, HEAD_CY - 4); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo( 9, HEAD_CY - 6); ctx.lineTo( 3, HEAD_CY - 4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-9, HEAD_CY - 6 + strain); ctx.lineTo(-3, HEAD_CY - 4 + strain * 0.4 + scowl); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo( 9, HEAD_CY - 6 + strain); ctx.lineTo( 3, HEAD_CY - 4 + strain * 0.4 + scowl); ctx.stroke();
 
   ctx.restore(); // lean
   ctx.restore(); // flip
 }
 
-function renderBoutFrame(ctx, W, H, phase, x1, x2, names, t = 1) {
+function renderBoutFrame(ctx, W, H, phase, x1, x2, names, t = 1,
+                         wrestlers = null, prevPhase = null, shake = { x: 0, y: 0 }) {
   const GY = H - 28;
-  const pn = phase.name; // phase name for effects
+  const pn = phase.name;
+  const vis1 = wrestlerVisuals(wrestlers?.w1);
+  const vis2 = wrestlerVisuals(wrestlers?.w2);
 
   // Sky gradient
   const sky = ctx.createLinearGradient(0, 0, 0, H);
@@ -406,6 +490,10 @@ function renderBoutFrame(ctx, W, H, phase, x1, x2, names, t = 1) {
     ctx.strokeStyle = '#3c2858'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(0, 5); ctx.lineTo(W, 5); ctx.stroke();
   }
+
+  // Scene layer — apply screen shake here (not to sky/crowd)
+  ctx.save();
+  ctx.translate(shake.x, shake.y);
 
   // Dohyo shadow
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
@@ -556,8 +644,12 @@ function renderBoutFrame(ctx, W, H, phase, x1, x2, names, t = 1) {
   }
 
   // Wrestlers
-  segaWrestler(ctx, x1, GY, 'left',  phase.pose1, '#c9a040', '#183acc');
-  segaWrestler(ctx, x2, GY, 'right', phase.pose2, '#d03028', '#101010');
+  const isW1Losing = phase.adv === 'w2';
+  const isW2Losing = phase.adv === 'w1';
+  segaWrestler(ctx, x1, GY, 'left',  phase.pose1, vis1.skin, vis1.belt,
+               vis1.scale, prevPhase?.pose1, t, isW1Losing);
+  segaWrestler(ctx, x2, GY, 'right', phase.pose2, vis2.skin, vis2.belt,
+               vis2.scale, prevPhase?.pose2, t, isW2Losing);
 
   // ── POST-WRESTLER EFFECTS ────────────────────────────────────
 
@@ -648,15 +740,51 @@ function renderBoutFrame(ctx, W, H, phase, x1, x2, names, t = 1) {
     drawTag(x2, (names.n2 || '').slice(0, 10), 'rgba(210,60,50,0.8)');
   }
 
+  ctx.restore(); // end shake layer
+
   // Scanlines
   ctx.fillStyle = 'rgba(0,0,0,0.028)';
   for (let y = 0; y < H; y += 2) ctx.fillRect(0, y, W, 1);
 }
 
-function BoutCanvas({ phases, currentPhase, names }) {
-  const cvRef  = useRef(null);
-  const posRef = useRef(null);
-  const rafRef = useRef(null);
+function WrestlerPortrait({ wrestler, side }) {
+  const cvRef = useRef(null);
+  const vis = wrestlerVisuals(wrestler);
+
+  useEffect(() => {
+    const cv = cvRef.current;
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    // Dark background gradient
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#0d0d20'); bg.addColorStop(1, '#070712');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    // Subtle vignette
+    const vig = ctx.createRadialGradient(W/2, H/2, H*0.1, W/2, H/2, H*0.8);
+    vig.addColorStop(0, 'rgba(0,0,0,0)'); vig.addColorStop(1, 'rgba(0,0,0,0.55)');
+    ctx.fillStyle = vig; ctx.fillRect(0, 0, W, H);
+    // Portrait head
+    drawPortraitHead(ctx, W / 2, H * 0.46, vis.skin, vis.belt, 1.85);
+    // Accent bar bottom
+    ctx.fillStyle = side === 'left' ? 'rgba(201,168,76,0.8)' : 'rgba(232,64,64,0.8)';
+    ctx.fillRect(0, H - 2, W, 2);
+  }, [wrestler]);
+
+  return (
+    <canvas
+      ref={cvRef}
+      width={68} height={82}
+      style={{ width: 54, height: 66, borderRadius: 6, border: '1px solid #1c1c36', flexShrink: 0, display: 'block' }}
+    />
+  );
+}
+
+function BoutCanvas({ phases, currentPhase, names, wrestlers }) {
+  const cvRef       = useRef(null);
+  const posRef      = useRef(null);
+  const rafRef      = useRef(null);
+  const prevPhaseRef = useRef(null);
 
   useEffect(() => {
     const cv = cvRef.current;
@@ -664,6 +792,7 @@ function BoutCanvas({ phases, currentPhase, names }) {
     const ctx = cv.getContext('2d');
     const W = cv.width, H = cv.height;
     const cur = phases[currentPhase];
+    const prevPhase = prevPhaseRef.current;
     const tX1 = cur.x1 * W, tX2 = cur.x2 * W;
 
     if (!posRef.current) posRef.current = { x1: tX1, x2: tX2 };
@@ -678,13 +807,25 @@ function BoutCanvas({ phases, currentPhase, names }) {
       const x1 = sX1 + (tX1 - sX1) * e;
       const x2 = sX2 + (tX2 - sX2) * e;
       posRef.current = { x1, x2 };
-      renderBoutFrame(ctx, W, H, cur, x1, x2, names, t);
+
+      // Impact shake — decays over first 30% of animation
+      const pn = cur.name;
+      const shakeMag = t < 0.30 && (pn === 'Tachiai' || pn === 'Finish')
+        ? (0.30 - t) * (pn === 'Finish' ? 32 : 20)
+        : 0;
+      const shake = {
+        x: shakeMag > 0 ? (Math.random() - 0.5) * shakeMag : 0,
+        y: shakeMag > 0 ? (Math.random() - 0.5) * shakeMag * 0.35 : 0,
+      };
+
+      renderBoutFrame(ctx, W, H, cur, x1, x2, names, e, wrestlers, prevPhase, shake);
       if (t < 1) rafRef.current = requestAnimationFrame(tick);
     };
 
     rafRef.current = requestAnimationFrame(tick);
+    prevPhaseRef.current = cur;
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [currentPhase, phases, names]);
+  }, [currentPhase, phases, names, wrestlers]);
 
   return (
     <canvas
@@ -699,6 +840,10 @@ function BoutCanvas({ phases, currentPhase, names }) {
 // ─────────────────────────────────────────────────────────────────
 //  FIGHT VIEWER
 // ─────────────────────────────────────────────────────────────────
+const PHASE_DURATIONS = {
+  Shikiri: 3000, Tachiai: 1700, 'Grip Battle': 2400, 'Push & Position': 2000, Finish: 4200,
+};
+
 function FightViewer({ bout, onClose, kachiKoshi }) {
   const [phase, setPhase] = useState(0);
   const timerRef = useRef(null);
@@ -706,14 +851,17 @@ function FightViewer({ bout, onClose, kachiKoshi }) {
   const isLast = phase === bout.phases.length - 1;
 
   useEffect(() => {
-    if (isLast) { clearInterval(timerRef.current); return; }
-    timerRef.current = setInterval(() => setPhase(p => Math.min(p + 1, bout.phases.length - 1)), 2400);
-    return () => clearInterval(timerRef.current);
-  }, [phase, isLast, bout.phases.length]);
+    if (isLast) { clearTimeout(timerRef.current); return; }
+    timerRef.current = setTimeout(
+      () => setPhase(p => Math.min(p + 1, bout.phases.length - 1)),
+      PHASE_DURATIONS[cur.name] ?? 2400
+    );
+    return () => clearTimeout(timerRef.current);
+  }, [phase, isLast, bout.phases.length, cur.name]);
 
   const advance = () => {
     if (isLast) { onClose(); return; }
-    clearInterval(timerRef.current);
+    clearTimeout(timerRef.current);
     setPhase(p => Math.min(p + 1, bout.phases.length - 1));
   };
 
@@ -731,20 +879,36 @@ function FightViewer({ bout, onClose, kachiKoshi }) {
         <span style={{ color:'#444', fontSize:22, lineHeight:1 }}>✕</span>
       </div>
 
-      {/* Name plates */}
-      <div style={{ width:'100%', maxWidth:430, display:'flex', justifyContent:'space-between', padding:'0 16px 10px' }}>
-        <div>
-          <div style={{ color:GOLD, fontFamily:'Noto Serif JP,serif', fontSize:13, fontWeight:700 }}>{bout.w1.name}</div>
-          <div style={{ color:'#3a3a60', fontFamily:'JetBrains Mono,monospace', fontSize:10 }}>EFF {Math.round(bout.e1)}</div>
+      {/* Wrestler nameplates with portraits */}
+      <div style={{ width:'100%', maxWidth:430, display:'flex', justifyContent:'space-between', alignItems:'flex-end', padding:'0 12px 8px', gap:8 }}>
+        {/* Left (player wrestler) */}
+        <div style={{ display:'flex', alignItems:'flex-end', gap:8, flex:1 }}>
+          <WrestlerPortrait wrestler={bout.w1} side="left" />
+          <div>
+            <div style={{ color:GOLD, fontFamily:'Noto Serif JP,serif', fontSize:13, fontWeight:700, lineHeight:1.2 }}>{bout.w1.name}</div>
+            <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:1 }}>{bout.w1.rank}</div>
+            <div style={{ color:'#333', fontFamily:'JetBrains Mono,monospace', fontSize:9 }}>EFF {Math.round(bout.e1)}</div>
+            <div style={{ width:6, height:6, borderRadius:'50%', background: PERSONALITY_COLORS[bout.w1.personality] || '#555', marginTop:3 }} />
+          </div>
         </div>
-        <div style={{ textAlign:'right' }}>
-          <div style={{ color:RED, fontFamily:'Noto Serif JP,serif', fontSize:13, fontWeight:700 }}>{bout.w2.name}</div>
-          <div style={{ color:'#3a3a60', fontFamily:'JetBrains Mono,monospace', fontSize:10 }}>EFF {Math.round(bout.e2)}</div>
+        {/* VS divider */}
+        <div style={{ color:'#1a1a30', fontFamily:'Noto Serif JP,serif', fontSize:18, paddingBottom:6 }}>対</div>
+        {/* Right (opponent) — mirrored layout */}
+        <div style={{ display:'flex', alignItems:'flex-end', gap:8, flex:1, flexDirection:'row-reverse' }}>
+          <WrestlerPortrait wrestler={bout.w2} side="right" />
+          <div style={{ textAlign:'right' }}>
+            <div style={{ color:RED, fontFamily:'Noto Serif JP,serif', fontSize:13, fontWeight:700, lineHeight:1.2 }}>{bout.w2.name}</div>
+            <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:1 }}>{bout.w2.rank}</div>
+            <div style={{ color:'#333', fontFamily:'JetBrains Mono,monospace', fontSize:9 }}>EFF {Math.round(bout.e2)}</div>
+            <div style={{ width:6, height:6, borderRadius:'50%', background: PERSONALITY_COLORS[bout.w2.personality] || '#555', marginTop:3, marginLeft:'auto' }} />
+          </div>
         </div>
       </div>
 
       {/* Arena — Sega-style 2D Canvas */}
-      <BoutCanvas phases={bout.phases} currentPhase={phase} names={{ n1: bout.w1.name, n2: bout.w2.name }} />
+      <BoutCanvas phases={bout.phases} currentPhase={phase}
+                  names={{ n1: bout.w1.name, n2: bout.w2.name }}
+                  wrestlers={{ w1: bout.w1, w2: bout.w2 }} />
 
       {/* Phase progress dots */}
       <div style={{ display:'flex', gap:6, padding:'14px 0 6px' }}>
@@ -771,6 +935,15 @@ function FightViewer({ bout, onClose, kachiKoshi }) {
         <div style={{ maxWidth:370, width:'92%', background:'linear-gradient(135deg,#0c1a08,#0a1408)', border:'1px solid rgba(68,204,102,0.5)', borderRadius:12, padding:'14px', marginBottom:10, textAlign:'center', boxShadow:'0 0 24px rgba(68,204,102,0.15)' }}>
           <div style={{ color:GREEN, fontSize:22, fontFamily:'Noto Serif JP,serif', fontWeight:700, letterSpacing:2 }}>勝ち越し</div>
           <div style={{ color:'#2a5a2a', fontFamily:'JetBrains Mono,monospace', fontSize:10, letterSpacing:4 }}>KACHI-KOSHI · MAJORITY WINS</div>
+        </div>
+      )}
+
+      {/* Kimarite flash */}
+      {isLast && (
+        <div style={{ fontFamily:'Noto Serif JP,serif', fontSize:18, fontWeight:700,
+                      color: cur.winner==='w1' ? GOLD : RED,
+                      letterSpacing:3, marginBottom:6, textAlign:'center' }}>
+          {cur.kimarite?.toUpperCase()}
         </div>
       )}
 
