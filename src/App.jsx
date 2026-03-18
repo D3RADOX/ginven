@@ -162,50 +162,255 @@ function generateBout(w1, w2) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-//  PIXEL WRESTLER  (CSS div-art, inline styles, CSS transitions)
+//  SEGA-STYLE 2D CANVAS BOUT RENDERER
 // ─────────────────────────────────────────────────────────────────
-const POSE_CFG = {
-  squat:    { bLean:  0, bY:  10, lA: '-38deg', rA: '38deg',  lL: '-36deg', rL: '36deg' },
-  ready:    { bLean:  0, bY:   0, lA: '-24deg', rA: '24deg',  lL: '-18deg', rL: '18deg' },
-  charge:   { bLean: 22, bY:   4, lA: '-52deg', rA: '-8deg',  lL:  '-8deg', rL:  '8deg' },
-  grip:     { bLean: 12, bY:   2, lA:  '32deg', rA: '-32deg', lL: '-26deg', rL: '26deg' },
-  grip_def: { bLean: -5, bY:   5, lA: '-32deg', rA:  '32deg', lL: '-32deg', rL: '32deg' },
-  push:     { bLean: 28, bY:   0, lA: '-14deg', rA: '-14deg', lL:  '-7deg', rL:  '7deg' },
-  retreat:  { bLean:-22, bY:   5, lA:  '22deg', rA: '-22deg', lL: '-22deg', rL: '22deg' },
-  victory:  { bLean:  0, bY:  -5, lA:'-134deg', rA:'134deg',  lL: '-14deg', rL: '14deg' },
-  fall:     { bLean: 50, bY:  16, lA:  '65deg', rA:  '85deg', lL: '-48deg', rL: '48deg' },
+
+// Pose: [bodyLean°, lArm°, rArm°, lLeg°, rLeg°, tuckY]
+const CPOSES = {
+  squat:    [  0, -44,  44, -48,  48,  14],
+  ready:    [  0, -28,  28, -20,  20,   0],
+  charge:   [ 24, -60, -12, -10,  10,   4],
+  grip:     [ 14,  38, -38, -28,  28,   2],
+  grip_def: [ -6, -38,  38, -36,  36,   6],
+  push:     [ 30, -20, -20,  -8,   8,   0],
+  retreat:  [-24,  28, -28, -22,  22,   6],
+  victory:  [  0,-140, 140, -16,  16,  -8],
+  fall:     [ 52,  68,  88, -52,  52,  20],
 };
 
-function PixelWrestler({ side, pose = 'ready', bodyHex, beltHex }) {
-  const pc = POSE_CFG[pose] || POSE_CFG.ready;
-  const TR = 'all 0.52s cubic-bezier(0.4,0,0.2,1)';
-  const flip = side === 'right' ? 'scaleX(-1)' : 'scaleX(1)';
+function rrect(ctx, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y,     x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x,     y + h, r);
+  ctx.arcTo(x,     y + h, x,     y,     r);
+  ctx.arcTo(x,     y,     x + w, y,     r);
+  ctx.closePath();
+}
 
-  const bodyStyle = { position:'absolute', background: bodyHex, border: '1.5px solid rgba(0,0,0,0.22)', borderRadius:'50%', transition: TR };
+function segaWrestler(ctx, cx, groundY, side, pose, skin, belt) {
+  const pc = CPOSES[pose] || CPOSES.ready;
+  const [lean, lA, rA, lL, rL, tY] = pc;
+  const OL   = '#08060a';
+  const flip = side === 'right' ? -1 : 1;
+
+  // Vertical anchors relative to groundY
+  const HIP_Y   = -20 + tY;
+  const BELT_T  = -34 + tY;
+  const TORSO_T = -58 + tY;
+  const HEAD_CY = -74 + tY;
+  const SHLDR_Y = -54 + tY;
+
+  // Draw a limb: origin at (ox, oy), pivoted from top-centre
+  const limb = (ox, oy, w, h, angleDeg) => {
+    ctx.save();
+    ctx.translate(ox, oy);
+    ctx.rotate(angleDeg * Math.PI / 180);
+    ctx.fillStyle = OL;
+    rrect(ctx, -w / 2 - 1.5, -1.5, w + 3, h + 3, 5);
+    ctx.fill();
+    ctx.fillStyle = skin;
+    rrect(ctx, -w / 2, 0, w, h, 4);
+    ctx.fill();
+    ctx.restore();
+  };
+
+  ctx.save();
+  ctx.translate(cx, groundY);
+  ctx.scale(flip, 1);
+
+  // Body lean pivots around hip centre
+  ctx.save();
+  ctx.translate(0, HIP_Y);
+  ctx.rotate(lean * Math.PI / 180);
+  ctx.translate(0, -HIP_Y);
+
+  // Left arm (behind — drawn first)
+  limb(-15, SHLDR_Y, 11, 26, lA);
+
+  // Torso
+  ctx.fillStyle = OL;
+  rrect(ctx, -18, TORSO_T - 1.5, 38, 41, 9); ctx.fill();
+  ctx.fillStyle = skin;
+  rrect(ctx, -16.5, TORSO_T, 35, 38, 8);     ctx.fill();
+
+  // Mawashi belt
+  ctx.fillStyle = OL;
+  rrect(ctx, -20, BELT_T - 1.5, 42, 18, 5);  ctx.fill();
+  ctx.fillStyle = belt;
+  rrect(ctx, -18.5, BELT_T, 39, 16, 4);      ctx.fill();
+  // Knot highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.14)';
+  rrect(ctx, -5, BELT_T + 3, 10, 9, 3);      ctx.fill();
+
+  // Right arm (front)
+  limb(15, SHLDR_Y, 11, 26, rA);
+
+  // Left leg
+  limb(-10, HIP_Y + 8, 13, 24, lL);
+  // Right leg
+  limb( 10, HIP_Y + 8, 13, 24, rL);
+
+  // Head
+  ctx.fillStyle = OL;
+  ctx.beginPath(); ctx.ellipse(0, HEAD_CY, 18, 16, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.ellipse(0, HEAD_CY, 16.5, 14.5, 0, 0, Math.PI * 2); ctx.fill();
+
+  // Topknot
+  ctx.fillStyle = '#120810';
+  ctx.beginPath(); ctx.ellipse(0, HEAD_CY - 12, 6, 10, 0, 0, Math.PI * 2); ctx.fill();
+
+  // Eyes
+  ctx.fillStyle = '#0a0808';
+  ctx.beginPath(); ctx.ellipse(-6, HEAD_CY + 1, 3.5, 3, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse( 6, HEAD_CY + 1, 3.5, 3, 0, 0, Math.PI * 2); ctx.fill();
+
+  // Brows (intensity expression)
+  ctx.strokeStyle = '#0a0808'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-9, HEAD_CY - 6); ctx.lineTo(-3, HEAD_CY - 4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo( 9, HEAD_CY - 6); ctx.lineTo( 3, HEAD_CY - 4); ctx.stroke();
+
+  ctx.restore(); // lean
+  ctx.restore(); // flip
+}
+
+function renderBoutFrame(ctx, W, H, phase, x1, x2) {
+  const GY = H - 28;
+
+  // Sky gradient
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0,   '#070510');
+  sky.addColorStop(0.5, '#0c0818');
+  sky.addColorStop(1,   '#080514');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, H);
+
+  // Crowd silhouettes — 4 rows
+  const crowdPalette = ['#1a0d30','#140924','#1c0c1c','#18101e'];
+  for (let row = 0; row < 4; row++) {
+    const ry = 6 + row * 18;
+    const count = 18 + row * 4;
+    for (let i = 0; i < count; i++) {
+      const hx = (i * (W / count)) + (row % 2) * (W / count / 2);
+      const hw = 10 + (i % 3) * 3;
+      const hh = 14 + (i % 4) * 3;
+      ctx.fillStyle = crowdPalette[(i + row) % 4];
+      ctx.fillRect(hx + 1, ry + hh * 0.42, hw - 2, hh * 0.62);
+      ctx.beginPath();
+      ctx.ellipse(hx + hw / 2, ry + hh * 0.28, hw * 0.38, hh * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Hanging banners
+  const bannerCols = ['#1e0a30','#0a1c0a','#1e0808','#1c1608'];
+  for (let i = 0; i < 8; i++) {
+    const bx = i * 58 - 6;
+    ctx.fillStyle = bannerCols[i % 4];
+    ctx.fillRect(bx, 0, 28, 54);
+    ctx.strokeStyle = '#2e1e48'; ctx.lineWidth = 1;
+    ctx.strokeRect(bx, 0, 28, 54);
+    // Rope
+    ctx.strokeStyle = '#3c2858'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, 5); ctx.lineTo(W, 5); ctx.stroke();
+  }
+
+  // Dohyo shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.beginPath();
+  ctx.ellipse(W / 2, GY + 20, W * 0.44, 22, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Dohyo clay
+  const clay = ctx.createRadialGradient(W / 2, GY - 12, 18, W / 2, GY + 4, W * 0.44);
+  clay.addColorStop(0,   '#dab890');
+  clay.addColorStop(0.65,'#c09a70');
+  clay.addColorStop(1,   '#8a6040');
+  ctx.fillStyle = clay;
+  ctx.beginPath();
+  ctx.ellipse(W / 2, GY + 6, W * 0.44, 36, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Tawara straw boundary
+  ctx.strokeStyle = '#6a3818'; ctx.lineWidth = 10;
+  ctx.beginPath();
+  ctx.ellipse(W / 2, GY + 6, W * 0.44, 36, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Tawara bale markings
+  ctx.fillStyle = '#8a5028';
+  for (let i = 0; i < 26; i++) {
+    const a = (i / 26) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(W / 2 + Math.cos(a) * W * 0.44, GY + 6 + Math.sin(a) * 36, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Shikiri lines
+  ctx.fillStyle = '#2a1414';
+  ctx.fillRect(W / 2 - 30, GY - 28, 5, 22);
+  ctx.fillRect(W / 2 + 25, GY - 28, 5, 22);
+
+  // Gyōji (referee) — simple geometric figure
+  const gx = W / 2 + 64, gy = GY - 48;
+  ctx.fillStyle = '#d8a860';
+  ctx.beginPath(); ctx.arc(gx, gy, 5.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#8a2808';
+  rrect(ctx, gx - 7, gy + 6, 14, 26, 3); ctx.fill();
+  ctx.fillStyle = '#c83800';
+  ctx.fillRect(gx - 12, gy + 10, 22, 3);
+
+  // Wrestlers
+  segaWrestler(ctx, x1, GY, 'left',  phase.pose1, '#c9a040', '#183acc');
+  segaWrestler(ctx, x2, GY, 'right', phase.pose2, '#d03028', '#101010');
+
+  // Scanlines
+  ctx.fillStyle = 'rgba(0,0,0,0.028)';
+  for (let y = 0; y < H; y += 2) ctx.fillRect(0, y, W, 1);
+}
+
+function BoutCanvas({ phases, currentPhase }) {
+  const cvRef  = useRef(null);
+  const posRef = useRef(null);
+  const rafRef = useRef(null);
+
+  useEffect(() => {
+    const cv = cvRef.current;
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    const cur = phases[currentPhase];
+    const tX1 = cur.x1 * W, tX2 = cur.x2 * W;
+
+    if (!posRef.current) posRef.current = { x1: tX1, x2: tX2 };
+    const { x1: sX1, x2: sX2 } = posRef.current;
+
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    let t = 0;
+
+    const tick = () => {
+      t = Math.min(1, t + 0.055);
+      const e = 1 - Math.pow(1 - t, 3);
+      const x1 = sX1 + (tX1 - sX1) * e;
+      const x2 = sX2 + (tX2 - sX2) * e;
+      posRef.current = { x1, x2 };
+      renderBoutFrame(ctx, W, H, cur, x1, x2);
+      if (t < 1) rafRef.current = requestAnimationFrame(tick);
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [currentPhase, phases]);
 
   return (
-    <div style={{ position:'relative', width:58, height:88, transform: flip, transition: TR, display:'inline-block' }}>
-      {/* Left arm — behind body */}
-      <div style={{ ...bodyStyle, top:36, left:-7, width:13, height:28, borderRadius:7, transformOrigin:'50% 0%', transform:`rotate(${pc.lA})` }} />
-      {/* Right arm */}
-      <div style={{ ...bodyStyle, top:36, right:-7, width:13, height:28, borderRadius:7, transformOrigin:'50% 0%', transform:`rotate(${pc.rA})` }} />
-      {/* Left leg */}
-      <div style={{ ...bodyStyle, bottom:3, left:10, width:13, height:22, borderRadius:5, transformOrigin:'50% 0%', transform:`rotate(${pc.lL})` }} />
-      {/* Right leg */}
-      <div style={{ ...bodyStyle, bottom:3, right:10, width:13, height:22, borderRadius:5, transformOrigin:'50% 0%', transform:`rotate(${pc.rL})` }} />
-      {/* Body */}
-      <div style={{ position:'absolute', top:34, left:4, width:50, height:44, background: bodyHex, border:'1.5px solid rgba(0,0,0,0.22)', borderRadius:'42%', transformOrigin:'50% 18%', transform:`rotate(${pc.bLean}deg) translateY(${pc.bY}px)`, transition: TR }} />
-      {/* Mawashi belt */}
-      <div style={{ position:'absolute', top:52, left:2, width:54, height:14, background: beltHex, borderRadius:4, transformOrigin:'50% -2%', transform:`rotate(${pc.bLean * 0.7}deg) translateY(${pc.bY * 0.6}px)`, transition: TR }} />
-      {/* Head */}
-      <div style={{ position:'absolute', top:10, left:11, width:36, height:30, background: bodyHex, border:'1.5px solid rgba(0,0,0,0.22)', borderRadius:'50%', transition: TR }} />
-      {/* Topknot */}
-      <div style={{ position:'absolute', top:1, left:19, width:20, height:14, background:'#12090a', borderRadius:'50% 50% 25% 25%', transition: TR }} />
-      {/* Eye left */}
-      <div style={{ position:'absolute', top:17, left:17, width:7, height:6, background:'#111', borderRadius:'50%', transition: TR }} />
-      {/* Eye right */}
-      <div style={{ position:'absolute', top:17, left:34, width:7, height:6, background:'#111', borderRadius:'50%', transition: TR }} />
-    </div>
+    <canvas
+      ref={cvRef}
+      width={430}
+      height={272}
+      style={{ width: '100%', display: 'block' }}
+    />
   );
 }
 
@@ -256,37 +461,8 @@ function FightViewer({ bout, onClose }) {
         </div>
       </div>
 
-      {/* Arena */}
-      <div style={{ width:'100%', maxWidth:430, height:210, position:'relative', background:'linear-gradient(180deg,#08050f 0%,#100a1a 100%)', borderTop:'1px solid #18143a', borderBottom:'1px solid #18143a', overflow:'hidden' }}>
-
-        {/* Crowd dots */}
-        {Array.from({ length: 80 }, (_, i) => (
-          <div key={i} style={{ position:'absolute', left:`${(i*37+11)%100}%`, top:`${4+(i*17%20)}%`, width:3, height:3, borderRadius:'50%', background: i%3===0?'#2a1a50':i%3===1?'#3a1a3a':'#1a1438', opacity:0.7 }} />
-        ))}
-
-        {/* Dohyo clay */}
-        <div style={{ position:'absolute', bottom:18, left:'5%', width:'90%', height:100, background:'radial-gradient(ellipse,#d4b08c 0%,#c09870 55%,#a07850 100%)', borderRadius:'50%', border:'4px solid #8a6040', boxShadow:'0 6px 24px rgba(0,0,0,0.6)' }} />
-
-        {/* Shikiri lines */}
-        <div style={{ position:'absolute', bottom:50, left:'44%', width:4, height:18, background:'#2a2020', borderRadius:2 }} />
-        <div style={{ position:'absolute', bottom:50, right:'44%', width:4, height:18, background:'#2a2020', borderRadius:2 }} />
-
-        {/* Gyōji (referee) */}
-        <div style={{ position:'absolute', right:28, bottom:74 }}>
-          <div style={{ width:9, height:9, borderRadius:'50%', background:'#d4a060', marginLeft:1 }} />
-          <div style={{ width:11, height:18, background:'#a03010', borderRadius:'2px 2px 5px 5px', marginTop:1 }} />
-          <div style={{ width:16, height:3, background:'#c84000', marginTop:-6, marginLeft:-3, borderRadius:1 }} />
-        </div>
-
-        {/* Wrestler 1 (gold) */}
-        <div style={{ position:'absolute', bottom:24, left:`${cur.x1 * 100}%`, transform:'translateX(-50%)', transition:'left 0.52s cubic-bezier(0.4,0,0.2,1)' }}>
-          <PixelWrestler side="left"  pose={cur.pose1} bodyHex="#c9a04a" beltHex="#1e3a9a" />
-        </div>
-        {/* Wrestler 2 (red) */}
-        <div style={{ position:'absolute', bottom:24, left:`${cur.x2 * 100}%`, transform:'translateX(-50%)', transition:'left 0.52s cubic-bezier(0.4,0,0.2,1)' }}>
-          <PixelWrestler side="right" pose={cur.pose2} bodyHex="#c84040" beltHex="#1a1a1a" />
-        </div>
-      </div>
+      {/* Arena — Sega-style 2D Canvas */}
+      <BoutCanvas phases={bout.phases} currentPhase={phase} />
 
       {/* Phase progress dots */}
       <div style={{ display:'flex', gap:6, padding:'14px 0 6px' }}>
