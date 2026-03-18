@@ -470,15 +470,47 @@ function renderBoutFrame(ctx, W, H, phase, x1, x2, names, t = 1) {
     }
   }
 
-  // Grip: pressure dots at contact zone
-  if (pn === 'Grip Battle') {
+  // Grip: pressure dots + momentum arc
+  if (pn === 'Grip Battle' || pn === 'Push & Position') {
     const mx = (x1 + x2) / 2;
-    ctx.fillStyle = 'rgba(220,200,160,0.35)';
-    for (let d = 0; d < 5; d++) {
-      const angle = (d / 5) * Math.PI * 2;
+    // Pressure dots (grip only)
+    if (pn === 'Grip Battle') {
+      ctx.fillStyle = 'rgba(220,200,160,0.35)';
+      for (let d = 0; d < 5; d++) {
+        const angle = (d / 5) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.arc(mx + Math.cos(angle) * 6, GY - 38 + Math.sin(angle) * 8, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // Momentum arc — dashed quadratic curve with arrowhead, fades in with t
+    if (t > 0.25) {
+      const arcAlpha = Math.min(0.55, (t - 0.25) * 1.2);
+      const adv = phase.adv || 'even';
+      // Control point leans toward advantaged side
+      const cpX = adv === 'w1' ? mx + 20 : adv === 'w2' ? mx - 20 : mx;
+      const cpY = GY - 58;
+      ctx.save();
+      ctx.strokeStyle = `rgba(200,168,80,${arcAlpha})`;
+      ctx.lineWidth = 1.8;
+      ctx.setLineDash([4, 7]);
       ctx.beginPath();
-      ctx.arc(mx + Math.cos(angle) * 6, GY - 38 + Math.sin(angle) * 8, 2.5, 0, Math.PI * 2);
+      ctx.moveTo(x1 + 18, GY - 32);
+      ctx.quadraticCurveTo(cpX, cpY, x2 - 18, GY - 32);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Arrowhead at the disadvantaged end
+      const arrowDir = adv === 'w2' ? -1 : 1; // points toward w2 if w1 has adv
+      const ax = mx + arrowDir * 8;
+      const ay = GY - 32 - 4; // slightly above curve baseline
+      ctx.fillStyle = `rgba(200,168,80,${arcAlpha})`;
+      ctx.beginPath();
+      ctx.moveTo(ax + arrowDir * 7, ay);
+      ctx.lineTo(ax - arrowDir * 1, ay - 5);
+      ctx.lineTo(ax - arrowDir * 1, ay + 5);
+      ctx.closePath();
       ctx.fill();
+      ctx.restore();
     }
   }
 
@@ -819,7 +851,7 @@ function CondBar({ stat, val }) {
         <span style={{ color:col, fontSize:11, fontFamily:'JetBrains Mono,monospace', fontWeight:700 }}>{Math.round(val)}</span>
       </div>
       <div style={{ height:5, background:'#12122a', borderRadius:3, position:'relative', outline: critFatigue ? '1px solid rgba(232,64,64,0.35)' : 'none' }}>
-        <div style={{ height:'100%', width:`${val}%`, background:grad, borderRadius:3, transition:'width 0.35s' }} />
+        <div style={{ height:'100%', width:`${val}%`, background:grad, borderRadius:3, transition:'width 0.35s', animation: critFatigue ? 'pulseGlow 1.1s ease-in-out infinite' : 'none' }} />
         {[25, 50, 75].map(t => (
           <div key={t} style={{ position:'absolute', top:0, left:`${t}%`, width:1, height:'100%', background:'rgba(255,255,255,0.07)' }} />
         ))}
@@ -828,8 +860,17 @@ function CondBar({ stat, val }) {
   );
 }
 
-function Card({ children, style }) {
-  return <div style={{ background:'#0f0f1e', borderRadius:12, border:'1px solid #1c1c36', ...style }}>{children}</div>;
+function Card({ children, style, selected, elevated }) {
+  const shadow = selected
+    ? '0 0 0 1px rgba(201,168,76,0.4), inset 0 0 14px rgba(201,168,76,0.06), 0 4px 22px rgba(0,0,0,0.55)'
+    : elevated
+    ? '0 2px 14px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.025)'
+    : '0 1px 6px rgba(0,0,0,0.4)';
+  return (
+    <div style={{ background:'#0f0f1e', borderRadius:12, border:`1px solid ${selected ? 'rgba(201,168,76,0.3)' : '#1c1c36'}`, boxShadow:shadow, ...style }}>
+      {children}
+    </div>
+  );
 }
 
 function Section({ label, children }) {
@@ -1039,7 +1080,7 @@ export default function App() {
 
       {/* Avg condition */}
       <Section label="STABLE CONDITION">
-        <Card style={{ margin:'0 16px', padding:'14px' }}>
+        <Card elevated style={{ margin:'0 16px', padding:'14px' }}>
           {['morale','fatigue','discipline'].map(s => <CondBar key={s} stat={s} val={avgCond(s)} />)}
         </Card>
       </Section>
@@ -1069,7 +1110,7 @@ export default function App() {
         {selW.injured && <div style={{ color:RED, fontSize:11, fontFamily:'JetBrains Mono,monospace', marginTop:4 }}>⚠ INJURED — {selW.injuryDays} sessions remaining</div>}
       </div>
       <Section label="BASE STATS">
-        <Card style={{ margin:'0 16px', padding:'12px' }}>
+        <Card elevated style={{ margin:'0 16px', padding:'12px' }}>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
             {Object.entries(selW.stats).map(([s, v]) => (
               <div key={s} style={{ padding:'8px 10px', background:'#0a0a18', borderRadius:8, border:'1px solid #181830' }}>
@@ -1084,12 +1125,12 @@ export default function App() {
         </Card>
       </Section>
       <Section label="CONDITION">
-        <Card style={{ margin:'0 16px', padding:'14px' }}>
+        <Card elevated style={{ margin:'0 16px', padding:'14px' }}>
           {Object.entries(selW.condition).map(([s, v]) => <CondBar key={s} stat={s} val={v} />)}
         </Card>
       </Section>
       <Section label="PROFILE">
-        <Card style={{ margin:'0 16px', padding:'14px' }}>
+        <Card elevated style={{ margin:'0 16px', padding:'14px' }}>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:12 }}>
             <div>
               <div style={{ color:'#2e2e50', fontSize:9, letterSpacing:2, marginBottom:3 }}>PERSONALITY</div>
@@ -1268,7 +1309,7 @@ export default function App() {
       </div>
 
       {basho.bouts.map(b => (
-        <Card key={b.id} style={{ marginBottom:10, overflow:'hidden' }}>
+        <Card key={b.id} elevated={!!b.result} selected={!b.result} style={{ marginBottom:10, overflow:'hidden' }}>
           <div style={{ padding:'12px 14px' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
               <div>
@@ -1316,6 +1357,8 @@ export default function App() {
   const SCREENS = { stable: StableScreen, roster: RosterScreen, train: TrainScreen, scout: ScoutScreen, basho: BashoScreen };
 
   return (
+    <>
+    <style>{`@keyframes pulseGlow{0%,100%{box-shadow:0 0 3px rgba(232,64,64,0.35)}50%{box-shadow:0 0 10px rgba(232,64,64,0.85),0 0 20px rgba(232,64,64,0.3)}}`}</style>
     <div style={{ background:'#0a0a0f', minHeight:'100vh', maxWidth:430, margin:'0 auto', fontFamily:'DM Sans,system-ui,sans-serif', position:'relative' }}>
 
       {/* Top bar */}
@@ -1357,5 +1400,6 @@ export default function App() {
       {/* Fight Viewer modal */}
       {viewer && <FightViewer bout={viewer} onClose={() => setViewer(null)} />}
     </div>
+    </>
   );
 }
