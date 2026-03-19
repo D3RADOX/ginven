@@ -1378,6 +1378,21 @@ function FightViewer({ bout, onClose, kachiKoshi, lang = 'EN' }) {
 // ─────────────────────────────────────────────────────────────────
 const GOLD = '#c9a84c', RED = '#e84040', GREEN = '#44cc66', ORANGE = '#e8a840';
 
+// ── FM Design Tokens ──────────────────────────────────────────────
+const FM_BG      = '#0b0f19';   // main background — very dark navy
+const FM_SURFACE = '#111827';   // card surface
+const FM_SURFACE2= '#1a2235';   // elevated / selected surface
+const FM_BORDER  = '#1e2a3a';   // subtle border
+const FM_BORDER2 = '#263044';   // slightly visible border
+const FM_ACCENT  = '#3b82f6';   // primary interactive blue
+const FM_INDIGO  = '#6366f1';   // secondary accent indigo
+const FM_GREEN   = '#10b981';   // positive metrics
+const FM_AMBER   = '#f59e0b';   // caution / warning
+const FM_RED     = '#ef4444';   // negative / danger
+const FM_TEXT    = '#e2e8f0';   // primary text
+const FM_TEXT2   = '#94a3b8';   // secondary text
+const FM_TEXT3   = '#475569';   // muted text
+
 const PERSONALITY_COLORS = {
   'Workhorse':          '#4a8a4a',
   'Lazy Talent':        '#8a5a8a',
@@ -1433,20 +1448,18 @@ function RankBadge({ rank, size = 18 }) {
 
 function StatBar({ val, max = 99 }) {
   const pct = (val / max) * 100;
-  const grad = val > 90
-    ? 'linear-gradient(90deg,#9a7010,#c9a84c)'
-    : val > 75
-    ? 'linear-gradient(90deg,#7a5a10,#b8902c)'
-    : val > 50
-    ? 'linear-gradient(90deg,#2a4a7a,#4a88cc)'
-    : 'linear-gradient(90deg,#1e2e4a,#3a4a6a)';
-  const glow = val > 90 ? '0 0 6px rgba(200,168,76,0.5)' : 'none';
+  const grad = val > 85
+    ? `linear-gradient(90deg,${FM_GREEN}88,${FM_GREEN})`
+    : val > 65
+    ? `linear-gradient(90deg,${FM_ACCENT}88,${FM_ACCENT})`
+    : val > 40
+    ? `linear-gradient(90deg,${FM_INDIGO}88,${FM_INDIGO})`
+    : `linear-gradient(90deg,${FM_TEXT3}55,${FM_TEXT3}88)`;
   return (
-    <div style={{ height:4, background:'#12122a', borderRadius:2, flex:1, position:'relative' }}>
-      <div style={{ height:'100%', width:`${pct}%`, background:grad, borderRadius:2, transition:'width 0.3s', boxShadow:glow }} />
-      {/* Tick marks at 25/50/75 */}
+    <div style={{ height:4, background:FM_BORDER, borderRadius:2, flex:1, position:'relative' }}>
+      <div style={{ height:'100%', width:`${pct}%`, background:grad, borderRadius:2, transition:'width 0.3s' }} />
       {[25, 50, 75].map(t => (
-        <div key={t} style={{ position:'absolute', top:0, left:`${t}%`, width:1, height:'100%', background:'rgba(255,255,255,0.06)' }} />
+        <div key={t} style={{ position:'absolute', top:0, left:`${t}%`, width:1, height:'100%', background:'rgba(255,255,255,0.05)' }} />
       ))}
     </div>
   );
@@ -1455,25 +1468,22 @@ function StatBar({ val, max = 99 }) {
 function CondBar({ stat, val }) {
   const isFatigue = stat === 'fatigue';
   const col = isFatigue
-    ? (val > 70 ? RED : val > 40 ? ORANGE : GREEN)
-    : (val > 70 ? GREEN : val > 40 ? ORANGE : RED);
+    ? (val > 70 ? FM_RED : val > 40 ? FM_AMBER : FM_GREEN)
+    : (val > 70 ? FM_GREEN : val > 40 ? FM_AMBER : FM_RED);
   const grad = isFatigue
-    ? (val > 70 ? `linear-gradient(90deg,#8a1818,${RED})` : val > 40 ? `linear-gradient(90deg,#7a4010,${ORANGE})` : `linear-gradient(90deg,#206030,${GREEN})`)
-    : (val > 70 ? `linear-gradient(90deg,#206030,${GREEN})` : val > 40 ? `linear-gradient(90deg,#7a4010,${ORANGE})` : `linear-gradient(90deg,#8a1818,${RED})`);
-  const icon = isFatigue ? '▲' : stat === 'morale' ? '◆' : '⬡';
+    ? (val > 70 ? `linear-gradient(90deg,${FM_RED}88,${FM_RED})` : val > 40 ? `linear-gradient(90deg,${FM_AMBER}88,${FM_AMBER})` : `linear-gradient(90deg,${FM_GREEN}88,${FM_GREEN})`)
+    : (val > 70 ? `linear-gradient(90deg,${FM_GREEN}88,${FM_GREEN})` : val > 40 ? `linear-gradient(90deg,${FM_AMBER}88,${FM_AMBER})` : `linear-gradient(90deg,${FM_RED}88,${FM_RED})`);
   const critFatigue = isFatigue && val > 75;
   return (
     <div style={{ marginBottom:8 }}>
       <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
-        <span style={{ color:'#555', fontSize:11, fontFamily:'JetBrains Mono,monospace', textTransform:'capitalize', display:'flex', alignItems:'center', gap:4 }}>
-          <span style={{ color: col, fontSize:8, opacity:0.7 }}>{icon}</span>{stat}
-        </span>
-        <span style={{ color:col, fontSize:11, fontFamily:'JetBrains Mono,monospace', fontWeight:700 }}>{Math.round(val)}</span>
+        <span style={{ color:FM_TEXT3, fontSize:11, fontFamily:'DM Sans,system-ui,sans-serif', textTransform:'capitalize' }}>{stat}</span>
+        <span style={{ color:col, fontSize:11, fontFamily:'DM Sans,system-ui,sans-serif', fontWeight:600 }}>{Math.round(val)}</span>
       </div>
-      <div style={{ height:5, background:'#12122a', borderRadius:3, position:'relative', outline: critFatigue ? '1px solid rgba(232,64,64,0.35)' : 'none' }}>
+      <div style={{ height:5, background:FM_BORDER, borderRadius:3, position:'relative', outline: critFatigue ? `1px solid ${FM_RED}55` : 'none' }}>
         <div style={{ height:'100%', width:`${val}%`, background:grad, borderRadius:3, transition:'width 0.35s', animation: critFatigue ? 'pulseGlow 1.1s ease-in-out infinite' : 'none' }} />
         {[25, 50, 75].map(t => (
-          <div key={t} style={{ position:'absolute', top:0, left:`${t}%`, width:1, height:'100%', background:'rgba(255,255,255,0.07)' }} />
+          <div key={t} style={{ position:'absolute', top:0, left:`${t}%`, width:1, height:'100%', background:'rgba(255,255,255,0.05)' }} />
         ))}
       </div>
     </div>
@@ -1482,23 +1492,24 @@ function CondBar({ stat, val }) {
 
 function Card({ children, style, selected, elevated }) {
   const shadow = selected
-    ? '0 0 0 1px rgba(201,168,76,0.4), inset 0 0 14px rgba(201,168,76,0.06), 0 4px 22px rgba(0,0,0,0.55)'
+    ? `0 0 0 1px ${FM_ACCENT}55, 0 4px 22px rgba(0,0,0,0.55)`
     : elevated
     ? '0 2px 14px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.025)'
     : '0 1px 6px rgba(0,0,0,0.4)';
   return (
-    <div style={{ background:'#0f0f1e', borderRadius:12, border:`1px solid ${selected ? 'rgba(201,168,76,0.3)' : '#1c1c36'}`, boxShadow:shadow, ...style }}>
+    <div style={{ background: elevated ? FM_SURFACE2 : FM_SURFACE, borderRadius:10, border:`1px solid ${selected ? FM_ACCENT+'66' : FM_BORDER}`, boxShadow:shadow, ...style }}>
       {children}
     </div>
   );
 }
 
-function Section({ label, children }) {
+function Section({ label, children, accent }) {
+  const accentColor = accent || FM_ACCENT;
   return (
     <div style={{ marginBottom:4 }}>
-      <div style={{ display:'flex', alignItems:'center', gap:8, padding:'16px 16px 8px' }}>
-        <div style={{ width:2, height:14, background:'linear-gradient(180deg,#c9a84c,rgba(200,168,76,0))', borderRadius:1, flexShrink:0 }} />
-        <span style={{ color:'#454568', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3 }}>{label}</span>
+      <div style={{ display:'flex', alignItems:'center', gap:8, padding:'14px 16px 8px' }}>
+        <div style={{ width:2, height:14, background:`linear-gradient(180deg,${accentColor},${accentColor}00)`, borderRadius:1, flexShrink:0 }} />
+        <span style={{ color:FM_TEXT3, fontFamily:'DM Sans,system-ui,sans-serif', fontSize:10, letterSpacing:2, fontWeight:600, textTransform:'uppercase' }}>{label}</span>
       </div>
       {children}
     </div>
@@ -1783,22 +1794,24 @@ export default function App() {
   // ── SCREENS ──────────────────────────────────────────────────
 
   const StableScreen = (
-    <div style={{ paddingBottom:88 }}>
-      {/* Stat strip */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:1, margin:'12px 16px', borderRadius:10, overflow:'hidden', border:'1px solid #181830' }}>
+    <div style={{ paddingBottom:32 }}>
+
+      {/* ── Metric tiles ─────────────────────────────── */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6, padding:'12px 14px 0' }}>
         {[
-          { label:'RIKISHI',   val: wrestlers.length },
-          { label:'INJURED',   val: wrestlers.filter(w=>w.injured).length, warn:true },
-          { label:'REPUTATION',val: stable.reputation },
+          { label:'SQUAD',    val: wrestlers.length,                          color: FM_ACCENT },
+          { label:'INJURED',  val: wrestlers.filter(w=>w.injured).length,     color: wrestlers.filter(w=>w.injured).length > 0 ? FM_RED : FM_TEXT3 },
+          { label:'REP',      val: stable.reputation,                         color: FM_AMBER },
+          { label:'AVG EFF',  val: Math.round(wrestlers.reduce((s,w)=>s+calcEffective(w),0)/Math.max(1,wrestlers.length)), color: FM_GREEN },
         ].map(x => (
-          <div key={x.label} style={{ padding:'10px 4px', textAlign:'center', background:'#0d0d1c' }}>
-            <div style={{ color: x.warn && x.val > 0 ? RED : GOLD, fontSize:22, fontWeight:700, fontFamily:'JetBrains Mono,monospace' }}>{x.val}</div>
-            <div style={{ color:'#2e2e50', fontSize:9, letterSpacing:2 }}>{x.label}</div>
+          <div key={x.label} style={{ background:FM_SURFACE, borderRadius:8, border:`1px solid ${FM_BORDER}`, padding:'8px 6px', textAlign:'center' }}>
+            <div style={{ color:x.color, fontSize:20, fontWeight:700, lineHeight:1 }}>{x.val}</div>
+            <div style={{ color:FM_TEXT3, fontSize:8, letterSpacing:1, marginTop:3 }}>{x.label}</div>
           </div>
         ))}
       </div>
 
-      {/* Basho countdown strip */}
+      {/* ── Basho countdown ──────────────────────────── */}
       {(() => {
         const HATSU_NAMES = ['Hatsu 初場所','Haru 春場所','Natsu 夏場所','Nagoya 名古屋場所','Aki 秋場所','Kyushu 九州場所'];
         const HATSU_VENUES = ['Ryōgoku Kokugikan, Tokyo','EDION Arena, Osaka','Ryōgoku Kokugikan, Tokyo','Dolphins Arena, Nagoya','Ryōgoku Kokugikan, Tokyo','Marine Messe, Fukuoka'];
@@ -1809,50 +1822,52 @@ export default function App() {
         const daysUntil = (nextBashoMonth - stable.month) * 30 + (1 - stable.day);
         const isBashoMonth = BASHO_MONTHS.includes(stable.month);
         return (
-          <div style={{ margin:'0 16px 8px', padding:'10px 14px', background:'#0d0d1c', borderRadius:10, border:'1px solid #181830', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div style={{ margin:'10px 14px 0', padding:'10px 14px', background:FM_SURFACE, borderRadius:8, border:`1px solid ${isBashoMonth ? FM_AMBER+'55' : FM_BORDER}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <div>
-              <div style={{ color:GOLD, fontFamily:'Noto Serif JP,serif', fontSize:13, fontWeight:700 }}>{HATSU_NAMES[nextBashoIdx]}</div>
-              <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:1 }}>{HATSU_VENUES[nextBashoIdx]}</div>
+              <div style={{ color:FM_TEXT, fontSize:13, fontWeight:600 }}>{HATSU_NAMES[nextBashoIdx]}</div>
+              <div style={{ color:FM_TEXT3, fontSize:10, marginTop:1 }}>{HATSU_VENUES[nextBashoIdx]}</div>
             </div>
             <div style={{ textAlign:'right' }}>
               {isBashoMonth
-                ? <div style={{ color:GREEN, fontFamily:'JetBrains Mono,monospace', fontSize:11, fontWeight:700 }}>● NOW</div>
-                : <div style={{ color:'#555', fontFamily:'JetBrains Mono,monospace', fontSize:11 }}>{Math.max(0, daysUntil)}d away</div>
+                ? <div style={{ color:FM_GREEN, fontSize:11, fontWeight:700, display:'flex', alignItems:'center', gap:4 }}><span style={{ width:6, height:6, borderRadius:'50%', background:FM_GREEN, display:'inline-block' }} />LIVE NOW</div>
+                : <div><div style={{ color:FM_AMBER, fontSize:16, fontWeight:700 }}>{Math.max(0, daysUntil)}</div><div style={{ color:FM_TEXT3, fontSize:9 }}>days away</div></div>
               }
             </div>
           </div>
         );
       })()}
 
-      {/* Command Center — wrestler tiles */}
-      <Section label="COMMAND CENTER">
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, margin:'0 16px' }}>
+      {/* ── Squad command center ──────────────────────── */}
+      <Section label="SQUAD STATUS">
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, margin:'0 14px' }}>
           {wrestlers.map(w => {
             const eff = Math.round(calcEffective(w));
-            const hasSP      = (w.sp || 0) > 0;
+            const hasSP       = (w.sp || 0) > 0;
             const overTrained = w.condition.fatigue > 72;
             const lowMorale   = w.condition.morale < 42;
             const alert = w.injured ? 'INJURED' : overTrained ? 'OVERTRAINED' : lowMorale ? 'LOW MORALE' : hasSP ? `${w.sp} SP READY` : null;
-            const alertColor  = w.injured || overTrained ? RED : lowMorale ? ORANGE : GOLD;
+            const alertColor  = w.injured || overTrained ? FM_RED : lowMorale ? FM_AMBER : FM_AMBER;
+            const borderColor = hasSP ? `${FM_AMBER}55` : w.injured ? `${FM_RED}44` : overTrained ? `${FM_AMBER}33` : FM_BORDER;
             return (
               <div key={w.id} onClick={() => { setTab('roster'); setSelW(w); }}
-                style={{ background:'#0d0d1c', borderRadius:10, padding:'10px', cursor:'pointer',
-                         border:`1px solid ${hasSP ? 'rgba(201,168,76,0.35)' : w.injured ? '#2a1010' : overTrained ? '#2a1a10' : '#181830'}`,
-                         boxShadow: hasSP ? '0 0 10px rgba(201,168,76,0.08)' : 'none' }}>
+                style={{ background:FM_SURFACE, borderRadius:8, padding:'10px', cursor:'pointer', border:`1px solid ${borderColor}` }}>
                 <div style={{ display:'flex', alignItems:'flex-start', gap:7, marginBottom:6 }}>
-                  <WrestlerPortrait wrestler={w} side="left" style={{ width:38, height:46, flexShrink:0 }} />
+                  <WrestlerPortrait wrestler={w} side="left" style={{ width:36, height:44, flexShrink:0, borderRadius:5, border:`1px solid ${FM_BORDER2}` }} />
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ color:'#d8d8f0', fontSize:12, fontFamily:'Noto Serif JP,serif', fontWeight:700, lineHeight:1.2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{w.name}</div>
-                    <div style={{ color:'#2a2a48', fontSize:8, fontFamily:'JetBrains Mono,monospace', marginTop:1 }}>{w.rank}</div>
-                    <div style={{ color:w.injured ? RED : GOLD, fontSize:17, fontWeight:700, fontFamily:'JetBrains Mono,monospace', marginTop:2 }}>{eff}</div>
+                    <div style={{ color:FM_TEXT, fontSize:11, fontWeight:600, lineHeight:1.2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{w.name}</div>
+                    <div style={{ color:FM_TEXT3, fontSize:9, marginTop:1 }}>{w.rank}</div>
+                    <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:2 }}>
+                      <span style={{ color: w.injured ? FM_RED : FM_ACCENT, fontSize:16, fontWeight:700 }}>{eff}</span>
+                      <span style={{ color:FM_TEXT3, fontSize:8 }}>EFF</span>
+                    </div>
                   </div>
                 </div>
-                {/* Fatigue mini-bar */}
-                <div style={{ height:3, background:'#12122a', borderRadius:2, overflow:'hidden', marginBottom:4 }}>
-                  <div style={{ height:'100%', width:`${w.condition.fatigue}%`, background: overTrained ? RED : '#e8a840', borderRadius:2 }} />
+                {/* Fatigue bar */}
+                <div style={{ height:3, background:FM_BORDER, borderRadius:2, overflow:'hidden', marginBottom:4 }}>
+                  <div style={{ height:'100%', width:`${w.condition.fatigue}%`, background: overTrained ? FM_RED : FM_AMBER, borderRadius:2 }} />
                 </div>
                 {alert && (
-                  <div style={{ color:alertColor, fontSize:8, fontFamily:'JetBrains Mono,monospace', letterSpacing:1, fontWeight:700 }}>{alert} ›</div>
+                  <div style={{ color:alertColor, fontSize:9, fontWeight:600, letterSpacing:0.5 }}>{alert} ›</div>
                 )}
               </div>
             );
@@ -1860,230 +1875,242 @@ export default function App() {
         </div>
       </Section>
 
-      {/* Smart Alerts */}
+      {/* ── Smart Alerts ─────────────────────────────── */}
       {(() => {
         const alerts = [];
         wrestlers.forEach(w => {
           if (w.condition.fatigue > 72 && !w.injured)
-            alerts.push({ type:'warning', text:`${w.name}'s fatigue is critical (${Math.round(w.condition.fatigue)}). Switch to Butsukari-geiko recovery.`, action: () => { setWrestlerPolicies(p => ({...p, [w.id]:'light'})); setTab('train'); } });
+            alerts.push({ type:'warning', icon:'⚠', text:`${w.name}'s fatigue is critical (${Math.round(w.condition.fatigue)}). Switch to Butsukari-geiko.`, action: () => { setWrestlerPolicies(p => ({...p, [w.id]:'light'})); setTab('train'); } });
           if ((w.sp || 0) > 0)
-            alerts.push({ type:'sp', text:`${w.name} has ${w.sp} stat point${w.sp>1?'s':''} ready to allocate.`, action: () => { setTab('roster'); setSelW(w); } });
+            alerts.push({ type:'sp', icon:'▲', text:`${w.name} has ${w.sp} stat point${w.sp>1?'s':''} to allocate.`, action: () => { setTab('roster'); setSelW(w); } });
           if (w.condition.morale < 38 && !w.injured)
-            alerts.push({ type:'warning', text:`${w.name}'s morale is dangerously low (${Math.round(w.condition.morale)}). Consider Lenient culture or light training.`, action: () => setTab('train') });
+            alerts.push({ type:'warning', icon:'↓', text:`${w.name}'s morale is low (${Math.round(w.condition.morale)}). Consider Lenient culture.`, action: () => setTab('train') });
         });
         if (alerts.length === 0) return null;
         return (
-          <Section label={`ACTION NEEDED (${alerts.length})`}>
-            {alerts.slice(0, 5).map((a, i) => (
+          <Section label={`ACTIONS (${alerts.length})`} accent={FM_AMBER}>
+            {alerts.slice(0, 4).map((a, i) => (
               <div key={i} onClick={a.action}
-                style={{ margin:'0 16px 6px', padding:'10px 14px', background:'#0d0d1c', borderRadius:10,
-                         borderLeft:`3px solid ${a.type==='sp' ? GOLD : ORANGE}`, cursor:'pointer',
-                         display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <p style={{ color:'#9898b8', fontFamily:'Noto Serif JP,serif', fontSize:12, lineHeight:1.4, margin:0, flex:1 }}>{a.text}</p>
-                <span style={{ color:'#333', fontSize:16, marginLeft:8, flexShrink:0 }}>›</span>
+                style={{ margin:'0 14px 6px', padding:'10px 12px', background:FM_SURFACE, borderRadius:8,
+                         borderLeft:`3px solid ${a.type==='sp' ? FM_ACCENT : FM_AMBER}`, cursor:'pointer',
+                         display:'flex', alignItems:'center', gap:10 }}>
+                <span style={{ fontSize:14, flexShrink:0 }}>{a.icon}</span>
+                <p style={{ color:FM_TEXT2, fontSize:12, lineHeight:1.4, margin:0, flex:1 }}>{a.text}</p>
+                <span style={{ color:FM_TEXT3, fontSize:14, flexShrink:0 }}>›</span>
               </div>
             ))}
           </Section>
         );
       })()}
 
-      {/* Inbox */}
-      <Section label={`JIMUSHO · INBOX (${events.length})`}>
-        {events.length === 0 && <div style={{ color:'#2a2a44', fontFamily:'Noto Serif JP,serif', fontSize:13, fontStyle:'italic', padding:'12px 20px' }}>No recent events.</div>}
+      {/* ── Inbox ────────────────────────────────────── */}
+      <Section label={`INBOX (${events.length})`}>
+        {events.length === 0 && <div style={{ color:FM_TEXT3, fontSize:13, fontStyle:'italic', padding:'12px 16px' }}>No recent events.</div>}
         {events.map(ev => (
-          <div key={ev.id} style={{ margin:'0 16px 6px', padding:'10px 14px', background:'#0d0d1c', borderRadius:10, borderLeft:`3px solid ${ev.type==='error'?RED:ev.type==='warning'?ORANGE:'#2a3a7a'}` }}>
-            <p style={{ color:'#9898b8', fontFamily:'Noto Serif JP,serif', fontSize:13, lineHeight:1.5, margin:0 }}>{ev.text}</p>
+          <div key={ev.id} style={{ margin:'0 14px 6px', padding:'10px 12px', background:FM_SURFACE, borderRadius:8, borderLeft:`3px solid ${ev.type==='error'?FM_RED:ev.type==='warning'?FM_AMBER:FM_ACCENT}` }}>
+            <p style={{ color:FM_TEXT2, fontSize:12, lineHeight:1.5, margin:0 }}>{ev.text}</p>
           </div>
         ))}
       </Section>
     </div>
   );
 
-  const RosterScreen = selW ? (
-    // Wrestler detail
-    <div style={{ paddingBottom:88 }}>
-      <button onClick={() => setSelW(null)} style={{ background:'none', border:'none', color:GOLD, fontFamily:'JetBrains Mono,monospace', fontSize:12, cursor:'pointer', padding:'14px 16px', letterSpacing:2 }}>← ROSTER</button>
-      <div style={{ textAlign:'center', padding:'0 16px 16px' }}>
-        <div style={{ color:'#f0f0ff', fontSize:22, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{selW.name}</div>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginTop:4 }}>
-          <RankBadge rank={selW.rank} size={16} />
-          <span style={{ color:'#444', fontSize:11, fontFamily:'JetBrains Mono,monospace' }}>{selW.rank} · Age {selW.age}</span>
-        </div>
-        {selW.injured && <div style={{ color:RED, fontSize:11, fontFamily:'JetBrains Mono,monospace', marginTop:4 }}>⚠ INJURED — {selW.injuryDays} sessions remaining</div>}
-      </div>
-      <Section label={lang === 'EN' ? 'BASE STATS' : '基本能力 · STATS'}>
-        <Card elevated style={{ margin:'0 16px', padding:'12px' }}>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-            {Object.entries(selW.stats).map(([s, v]) => (
-              <div key={s} style={{ padding:'8px 10px', background:'#0a0a18', borderRadius:8, border:'1px solid #181830' }}>
-                <div style={{ color:'#2e2e50', fontSize:9, letterSpacing:2, marginBottom:4, textTransform:'uppercase' }}>{s}</div>
-                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <span style={{ color:GOLD, fontSize:20, fontWeight:700, fontFamily:'JetBrains Mono,monospace', minWidth:28 }}>{Math.round(v)}</span>
-                  <StatBar val={v} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </Section>
-      <Section label={lang === 'EN' ? 'CONDITION' : '状態 · CONDITION'}>
-        <Card elevated style={{ margin:'0 16px', padding:'14px' }}>
-          {Object.entries(selW.condition).map(([s, v]) => <CondBar key={s} stat={s} val={v} />)}
-        </Card>
-      </Section>
-      <Section label={lang === 'EN' ? 'PROFILE' : '力士情報 · PROFILE'}>
-        <Card elevated style={{ margin:'0 16px', padding:'14px' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:12 }}>
-            <div>
-              <div style={{ color:'#2e2e50', fontSize:9, letterSpacing:2, marginBottom:3 }}>PERSONALITY</div>
-              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                <div style={{ width:8, height:8, borderRadius:'50%', background: PERSONALITY_COLORS[selW.personality] || '#555', flexShrink:0 }} />
-                <span style={{ color:GOLD, fontFamily:'Noto Serif JP,serif', fontSize:14 }}>{selW.personality}</span>
-              </div>
-            </div>
-            <div style={{ textAlign:'right' }}><div style={{ color:'#2e2e50', fontSize:9, letterSpacing:2, marginBottom:3 }}>KIMARITE</div><div style={{ color:GOLD, fontFamily:'Noto Serif JP,serif', fontSize:14 }}>{selW.kimarite}</div></div>
-          </div>
-          <div style={{ display:'flex', justifyContent:'space-between' }}>
-            <div><div style={{ color:'#2e2e50', fontSize:9, letterSpacing:2, marginBottom:2 }}>WINS</div><div style={{ color:GREEN, fontSize:24, fontWeight:700, fontFamily:'JetBrains Mono,monospace' }}>{selW.record.wins}</div></div>
-            <div style={{ textAlign:'right' }}><div style={{ color:'#2e2e50', fontSize:9, letterSpacing:2, marginBottom:2 }}>LOSSES</div><div style={{ color:RED, fontSize:24, fontWeight:700, fontFamily:'JetBrains Mono,monospace' }}>{selW.record.losses}</div></div>
-          </div>
-        </Card>
-      </Section>
+  // Squad screen sub-tab state (defined here since it's local to roster screen)
+  const [squadTab, setSquadTab] = useState('overview'); // 'overview' | 'attrs' | 'perks'
 
-      {/* ── STAT ALLOCATION ──────────────────────────────────────── */}
-      {(selW.sp || 0) > 0 && (
-        <Section label={`STAT ALLOCATION — ${selW.sp} SP AVAILABLE`}>
-          <Card elevated style={{ margin:'0 16px', padding:'12px' }}>
-            <div style={{ color:'#2a2a48', fontFamily:'JetBrains Mono,monospace', fontSize:9, marginBottom:8, letterSpacing:1 }}>
-              SPEND 1 SP → +3 TO ANY STAT (max 99)
+  const RosterScreen = selW ? (() => {
+    // ── Wrestler detail view ──────────────────────────────────────
+    const eff = Math.round(calcEffective(selW));
+    const SUB_TABS = [{ id:'overview', label:'OVERVIEW' }, { id:'attrs', label:'ATTRIBUTES' }, { id:'perks', label:'PERKS' }];
+    return (
+      <div style={{ paddingBottom:32 }}>
+        {/* Back + header */}
+        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px', background:FM_SURFACE, borderBottom:`1px solid ${FM_BORDER}` }}>
+          <button onClick={() => setSelW(null)} style={{ background:FM_BORDER2, border:'none', color:FM_TEXT2, borderRadius:6, padding:'5px 10px', fontSize:11, cursor:'pointer' }}>← SQUAD</button>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ color:FM_TEXT, fontSize:14, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{selW.name}</div>
+            <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:1 }}>
+              <RankBadge rank={selW.rank} size={12} />
+              <span style={{ color:FM_TEXT3, fontSize:10 }}>{selW.rank} · Age {selW.age}</span>
+              {selW.injured && <span style={{ color:FM_RED, fontSize:9, fontWeight:600 }}>⚠ INJURED {selW.injuryDays}d</span>}
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-              {Object.entries(selW.stats).map(([s, v]) => (
-                <div key={s} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', background:'#0a0a18', borderRadius:8, border:'1px solid #181830' }}>
-                  <div>
-                    <div style={{ color:'#2a2a48', fontSize:8, letterSpacing:2, textTransform:'uppercase', marginBottom:1 }}>{s}</div>
-                    <div style={{ color:GOLD, fontSize:18, fontWeight:700, fontFamily:'JetBrains Mono,monospace', lineHeight:1 }}>{Math.round(v)}</div>
+          </div>
+          <div style={{ textAlign:'right', flexShrink:0 }}>
+            <div style={{ color: selW.injured ? FM_RED : FM_ACCENT, fontSize:22, fontWeight:700 }}>{eff}</div>
+            <div style={{ color:FM_TEXT3, fontSize:9 }}>EFF</div>
+          </div>
+        </div>
+
+        {/* Sub-tab strip */}
+        <div style={{ display:'flex', background:FM_SURFACE, borderBottom:`1px solid ${FM_BORDER}` }}>
+          {SUB_TABS.map(st => (
+            <button key={st.id} onClick={() => setSquadTab(st.id)}
+              style={{ flex:1, background:'none', border:'none', cursor:'pointer', padding:'9px 4px', fontSize:10, fontWeight: squadTab===st.id ? 700 : 400, color: squadTab===st.id ? FM_ACCENT : FM_TEXT3, position:'relative' }}>
+              {st.label}
+              {squadTab===st.id && <div style={{ position:'absolute', bottom:0, left:'15%', right:'15%', height:2, background:FM_ACCENT, borderRadius:'2px 2px 0 0' }} />}
+              {st.id === 'perks' && (selW.perks||[]).length > 0 && (
+                <span style={{ marginLeft:4, background:FM_ACCENT, color:'#fff', borderRadius:'50%', width:14, height:14, fontSize:8, display:'inline-flex', alignItems:'center', justifyContent:'center', fontWeight:700 }}>{(selW.perks||[]).length}</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* SP banner */}
+        {(selW.sp || 0) > 0 && (
+          <div style={{ margin:'12px 14px 0', padding:'8px 14px', background:`${FM_AMBER}18`, border:`1px solid ${FM_AMBER}44`, borderRadius:8, display:'flex', alignItems:'center', gap:8 }}>
+            <span style={{ fontSize:14 }}>▲</span>
+            <div style={{ flex:1 }}>
+              <span style={{ color:FM_AMBER, fontWeight:700, fontSize:12 }}>{selW.sp} Stat Point{selW.sp>1?'s':''} available</span>
+              <span style={{ color:FM_TEXT3, fontSize:10 }}> · Use in Attributes tab</span>
+            </div>
+          </div>
+        )}
+
+        {/* ── OVERVIEW tab ─────────────────────── */}
+        {squadTab === 'overview' && (
+          <>
+            {/* Bio card */}
+            <div style={{ margin:'12px 14px 0', background:FM_SURFACE, borderRadius:8, border:`1px solid ${FM_BORDER}`, padding:'12px', display:'flex', gap:12 }}>
+              <WrestlerPortrait wrestler={selW} side="left" style={{ width:64, height:78, borderRadius:8, border:`1px solid ${FM_BORDER2}`, flexShrink:0 }} />
+              <div style={{ flex:1, display:'flex', flexDirection:'column', gap:6 }}>
+                {[
+                  { label:'Personality', val: selW.personality, color: PERSONALITY_COLORS[selW.personality]||FM_TEXT3 },
+                  { label:'Kimarite',    val: selW.kimarite,    color: FM_TEXT },
+                  { label:'Record',      val: `${selW.record.wins}W – ${selW.record.losses}L`, color: FM_TEXT },
+                  { label:'Streak',      val: (selW.streak||0)===0 ? '—' : (selW.streak>0 ? `▲ ${selW.streak} wins` : `▼ ${Math.abs(selW.streak)} losses`), color: (selW.streak||0)>0?FM_GREEN:(selW.streak||0)<0?FM_RED:FM_TEXT3 },
+                ].map(row => (
+                  <div key={row.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <span style={{ color:FM_TEXT3, fontSize:11 }}>{row.label}</span>
+                    <span style={{ color:row.color, fontSize:11, fontWeight:600 }}>{row.val}</span>
                   </div>
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      if ((selW.sp || 0) < 1 || v >= 99) return;
-                      const newStats = { ...selW.stats, [s]: Math.min(99, v + 3) };
-                      setWrestlers(prev => prev.map(wr => wr.id === selW.id ? { ...wr, sp: wr.sp - 1, stats: newStats } : wr));
-                      setSelW(prev => ({ ...prev, sp: prev.sp - 1, stats: newStats }));
-                    }}
-                    style={{ background: v < 99 ? GOLD : '#1a1a30', color: v < 99 ? '#0a0a0f' : '#222',
-                             border:'none', borderRadius:6, width:30, height:30,
-                             fontFamily:'JetBrains Mono,monospace', fontSize:16, fontWeight:700,
-                             cursor: v < 99 ? 'pointer' : 'not-allowed', flexShrink:0,
-                             display:'flex', alignItems:'center', justifyContent:'center' }}>
-                    +
-                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Condition */}
+            <Section label="CONDITION">
+              <div style={{ margin:'0 14px', background:FM_SURFACE, borderRadius:8, border:`1px solid ${FM_BORDER}`, padding:'14px' }}>
+                {Object.entries(selW.condition).map(([s, v]) => <CondBar key={s} stat={s} val={v} />)}
+              </div>
+            </Section>
+          </>
+        )}
+
+        {/* ── ATTRIBUTES tab ───────────────────── */}
+        {squadTab === 'attrs' && (
+          <Section label={`ATTRIBUTES${(selW.sp||0)>0 ? ` · ${selW.sp} SP` : ''}`} accent={FM_ACCENT}>
+            {(selW.sp || 0) > 0 && (
+              <div style={{ margin:'0 14px 8px', color:FM_TEXT3, fontSize:10 }}>Spend 1 SP → +3 to any attribute (max 99)</div>
+            )}
+            <div style={{ display:'flex', flexDirection:'column', gap:2, margin:'0 14px' }}>
+              {Object.entries(selW.stats).map(([s, v]) => (
+                <div key={s} style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 12px', background:FM_SURFACE, borderRadius:6, border:`1px solid ${FM_BORDER}` }}>
+                  <span style={{ color:FM_TEXT3, fontSize:10, width:70, textTransform:'capitalize', flexShrink:0 }}>{s}</span>
+                  <StatBar val={v} />
+                  <span style={{ color: v >= 80 ? FM_GREEN : v >= 60 ? FM_ACCENT : FM_TEXT2, fontSize:13, fontWeight:700, width:22, textAlign:'right', flexShrink:0 }}>{Math.round(v)}</span>
+                  {(selW.sp || 0) > 0 && (
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        if ((selW.sp || 0) < 1 || v >= 99) return;
+                        const newStats = { ...selW.stats, [s]: Math.min(99, v + 3) };
+                        setWrestlers(prev => prev.map(wr => wr.id === selW.id ? { ...wr, sp: wr.sp - 1, stats: newStats } : wr));
+                        setSelW(prev => ({ ...prev, sp: prev.sp - 1, stats: newStats }));
+                      }}
+                      style={{ background: v < 99 ? FM_ACCENT : FM_BORDER, color: v < 99 ? '#fff' : FM_TEXT3,
+                               border:'none', borderRadius:5, width:26, height:26, fontSize:14, fontWeight:700,
+                               cursor: v < 99 ? 'pointer' : 'not-allowed', flexShrink:0,
+                               display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      +
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
-          </Card>
-        </Section>
-      )}
+          </Section>
+        )}
 
-      {/* ── PERKS ────────────────────────────────────────────────── */}
-      <Section label="PERKS · SKILL UPGRADES">
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, margin:'0 16px' }}>
-          {PERKS.map(perk => {
-            const owned    = (selW.perks || []).includes(perk.id);
-            const canMeet  = perkMet(perk, selW);
-            const canBuy   = canMeet && !owned && (selW.sp || 0) >= perk.cost;
-            const color    = owned ? GOLD : canMeet ? '#6688cc' : '#2a2a40';
-            const reqText  = Object.entries(perk.req).map(([k, v]) => k === 'age' ? `age ≥ ${v}` : k === 'age_max' ? `age ≤ ${v}` : k === 'growthRate' ? `talent ≥ ${v}` : `${k} ≥ ${v}`).join(' · ');
-            return (
-              <div key={perk.id}
-                onClick={e => {
-                  e.stopPropagation();
-                  if (!canBuy) return;
-                  const newPerks = [...(selW.perks || []), perk.id];
-                  setWrestlers(prev => prev.map(wr => wr.id === selW.id ? { ...wr, sp: wr.sp - perk.cost, perks: newPerks } : wr));
-                  setSelW(prev => ({ ...prev, sp: prev.sp - perk.cost, perks: newPerks }));
-                }}
-                style={{ padding:'10px', background: owned ? 'rgba(201,168,76,0.07)' : '#0d0d1c',
-                         borderRadius:10, border:`1px solid ${owned ? 'rgba(201,168,76,0.4)' : canMeet ? 'rgba(100,130,210,0.25)' : '#181830'}`,
-                         cursor: canBuy ? 'pointer' : 'default', opacity: !canMeet && !owned ? 0.4 : 1,
-                         boxShadow: canBuy ? '0 0 8px rgba(100,130,210,0.12)' : 'none' }}>
-                <div style={{ fontSize:20, marginBottom:4 }}>{perk.icon}</div>
-                <div style={{ color, fontSize:12, fontFamily:'Noto Serif JP,serif', fontWeight:700, marginBottom:3 }}>{perk.name}</div>
-                <div style={{ color:'#2a2a48', fontSize:9, fontFamily:'JetBrains Mono,monospace', marginBottom:6, lineHeight:1.3 }}>{perk.desc}</div>
-                {owned
-                  ? <div style={{ color:GOLD, fontSize:8, fontFamily:'JetBrains Mono,monospace', fontWeight:700 }}>✓ ACTIVE</div>
-                  : canMeet
-                    ? <div style={{ color:'#4466aa', fontSize:8, fontFamily:'JetBrains Mono,monospace' }}>
-                        {(selW.sp || 0) >= perk.cost ? `TAP · ${perk.cost} SP` : `NEED ${perk.cost} SP`}
-                      </div>
-                    : <div style={{ color:'#252545', fontSize:8, fontFamily:'JetBrains Mono,monospace' }}>{reqText}</div>
-                }
-              </div>
-            );
-          })}
-        </div>
-      </Section>
-    </div>
-  ) : (
-    // Roster list
-    <div style={{ padding:'12px 16px 88px' }}>
-      <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, marginBottom:10 }}>
-        {lang === 'EN' ? `WRESTLERS — ${wrestlers.length}` : `RIKISHI (力士) — ${wrestlers.length}`}
+        {/* ── PERKS tab ────────────────────────── */}
+        {squadTab === 'perks' && (
+          <Section label="SKILL UPGRADES">
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, margin:'0 14px' }}>
+              {PERKS.map(perk => {
+                const owned   = (selW.perks || []).includes(perk.id);
+                const canMeet = perkMet(perk, selW);
+                const canBuy  = canMeet && !owned && (selW.sp || 0) >= perk.cost;
+                const reqText = Object.entries(perk.req).map(([k, v]) => k === 'age' ? `age ≥ ${v}` : k === 'age_max' ? `age ≤ ${v}` : k === 'growthRate' ? `talent ≥ ${v}` : `${k} ≥ ${v}`).join(' · ');
+                const borderCol = owned ? `${FM_AMBER}66` : canMeet ? `${FM_ACCENT}44` : FM_BORDER;
+                const bgCol = owned ? `${FM_AMBER}12` : FM_SURFACE;
+                return (
+                  <div key={perk.id}
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (!canBuy) return;
+                      const newPerks = [...(selW.perks || []), perk.id];
+                      setWrestlers(prev => prev.map(wr => wr.id === selW.id ? { ...wr, sp: wr.sp - perk.cost, perks: newPerks } : wr));
+                      setSelW(prev => ({ ...prev, sp: prev.sp - perk.cost, perks: newPerks }));
+                    }}
+                    style={{ padding:'10px', background:bgCol, borderRadius:8, border:`1px solid ${borderCol}`,
+                             cursor: canBuy ? 'pointer' : 'default', opacity: !canMeet && !owned ? 0.4 : 1 }}>
+                    <div style={{ fontSize:20, marginBottom:4 }}>{perk.icon}</div>
+                    <div style={{ color: owned ? FM_AMBER : canMeet ? FM_TEXT : FM_TEXT3, fontSize:12, fontWeight:700, marginBottom:3 }}>{perk.name}</div>
+                    <div style={{ color:FM_TEXT3, fontSize:9, marginBottom:6, lineHeight:1.3 }}>{perk.desc}</div>
+                    {owned
+                      ? <div style={{ color:FM_AMBER, fontSize:9, fontWeight:600 }}>✓ ACTIVE +{perk.effBonus} EFF</div>
+                      : canMeet
+                        ? <div style={{ background: canBuy ? FM_ACCENT : FM_BORDER, color: canBuy ? '#fff' : FM_TEXT3, padding:'3px 8px', borderRadius:4, fontSize:9, fontWeight:600, textAlign:'center' }}>
+                            {(selW.sp||0) >= perk.cost ? `UNLOCK · ${perk.cost} SP` : `NEED ${perk.cost} SP`}
+                          </div>
+                        : <div style={{ color:FM_TEXT3, fontSize:9 }}>{reqText}</div>
+                    }
+                  </div>
+                );
+              })}
+            </div>
+          </Section>
+        )}
+      </div>
+    );
+  })() : (
+    // ── Roster list ──────────────────────────────────────────────
+    <div style={{ paddingBottom:24 }}>
+      {/* Column header */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 28px 28px 28px 28px 42px', gap:4, padding:'8px 14px 6px', borderBottom:`1px solid ${FM_BORDER}` }}>
+        <span style={{ color:FM_TEXT3, fontSize:9, fontWeight:600, letterSpacing:1 }}>WRESTLER</span>
+        {['POW','TEC','SPD','BAL'].map(s => <span key={s} style={{ color:FM_TEXT3, fontSize:8, textAlign:'center' }}>{s}</span>)}
+        <span style={{ color:FM_TEXT3, fontSize:8, textAlign:'center' }}>EFF</span>
       </div>
       {wrestlers.map(w => {
         const eff = Math.round(calcEffective(w));
         const hasSP = (w.sp || 0) > 0;
+        const overTrained = w.condition.fatigue > 72;
+        const moraleOk = w.condition.morale >= 40;
         return (
           <div key={w.id} onClick={() => setSelW(w)}
-            style={{ display:'flex', gap:10, padding:'10px 12px', marginBottom:8, background:'#0d0d1c',
-                     borderRadius:12, border:`1px solid ${hasSP ? 'rgba(201,168,76,0.35)' : w.injured ? '#2a1010' : '#181830'}`,
-                     cursor:'pointer', position:'relative', boxShadow: hasSP ? '0 0 10px rgba(201,168,76,0.07)' : 'none' }}>
-            {/* SP badge */}
-            {hasSP && (
-              <div style={{ position:'absolute', top:8, right:38, background:GOLD, color:'#0a0a0f', borderRadius:8,
-                            fontSize:8, fontWeight:700, fontFamily:'JetBrains Mono,monospace', padding:'1px 5px', lineHeight:1.5 }}>
-                {w.sp} SP
+            style={{ display:'grid', gridTemplateColumns:'1fr 28px 28px 28px 28px 42px', gap:4, alignItems:'center',
+                     padding:'8px 14px', cursor:'pointer',
+                     background: hasSP ? `${FM_AMBER}0a` : FM_BG,
+                     borderBottom:`1px solid ${FM_BORDER}`,
+                     borderLeft:`3px solid ${hasSP ? FM_AMBER : w.injured ? FM_RED : overTrained ? FM_AMBER : 'transparent'}` }}>
+            <div style={{ minWidth:0 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:1 }}>
+                <div style={{ width:7, height:7, borderRadius:'50%', background: w.injured ? FM_RED : !moraleOk ? FM_AMBER : overTrained ? FM_AMBER : FM_GREEN, flexShrink:0 }} />
+                <span style={{ color: w.injured ? FM_RED : FM_TEXT, fontSize:12, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{w.name}</span>
+                {hasSP && <span style={{ background:FM_AMBER, color:FM_BG, borderRadius:4, padding:'0 4px', fontSize:8, fontWeight:700, flexShrink:0 }}>{w.sp}SP</span>}
               </div>
-            )}
-            {/* Portrait */}
-            <WrestlerPortrait wrestler={w} side="left" style={{ width:44, height:54 }} />
-            {/* Info block */}
-            <div style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
-              <div>
-                <div style={{ color:w.injured?'#7a3030':'#d8d8f0', fontSize:14, fontFamily:'Noto Serif JP,serif', fontWeight:700, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', marginBottom:1 }}>{w.name}</div>
-                <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:4 }}>
-                  <RankBadge rank={w.rank} size={12} />
-                  <span style={{ color:'#333', fontSize:9, fontFamily:'JetBrains Mono,monospace' }}>{w.rank}</span>
-                  <span style={{ color: PERSONALITY_COLORS[w.personality]||'#555', fontSize:8, fontFamily:'JetBrains Mono,monospace', marginLeft:2 }}>· {w.personality}</span>
-                </div>
-              </div>
-              {/* 3 stat mini-bars */}
-              <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                {['power','technique','speed'].map(s => (
-                  <div key={s} style={{ display:'flex', alignItems:'center', gap:4 }}>
-                    <span style={{ color:'#252545', fontSize:7, fontFamily:'JetBrains Mono,monospace', width:18, textAlign:'right', textTransform:'uppercase' }}>{s.slice(0,3)}</span>
-                    <div style={{ flex:1, height:3, background:'#12122a', borderRadius:2, overflow:'hidden' }}>
-                      <div style={{ height:'100%', width:`${w.stats[s]}%`, background:'linear-gradient(90deg,#2a2a5a,#c9a84c)', borderRadius:2 }} />
-                    </div>
-                    <span style={{ color:'#333', fontSize:7, fontFamily:'JetBrains Mono,monospace', width:16, textAlign:'right' }}>{Math.round(w.stats[s])}</span>
-                  </div>
-                ))}
-              </div>
-              {/* Bottom row: condition dots + streak + W-L */}
-              <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:4 }}>
-                <div style={{ width:7, height:7, borderRadius:'50%', background: w.condition.morale < 40 ? RED : w.condition.morale > 70 ? GREEN : ORANGE, flexShrink:0 }} />
-                <div style={{ width:7, height:7, borderRadius:'50%', background: w.condition.fatigue > 70 ? RED : w.condition.fatigue > 40 ? ORANGE : GREEN, flexShrink:0 }} />
-                {w.injured && <span style={{ color:RED, fontSize:8, fontFamily:'JetBrains Mono,monospace' }}>INJ</span>}
-                {!w.injured && (w.streak||0) !== 0 && (
-                  <span style={{ fontSize:8, fontFamily:'JetBrains Mono,monospace', fontWeight:700, color:(w.streak||0)>0?GREEN:RED }}>
-                    {(w.streak||0)>0?`▲${w.streak}`:`▼${Math.abs(w.streak)}`}
-                  </span>
-                )}
-                <span style={{ marginLeft:'auto', color:'#2a2a48', fontSize:8, fontFamily:'JetBrains Mono,monospace' }}>{w.record.wins}W {w.record.losses}L</span>
+              <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                <RankBadge rank={w.rank} size={10} />
+                <span style={{ color:FM_TEXT3, fontSize:9, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{w.rank}</span>
               </div>
             </div>
-            <div style={{ color:'#282848', fontSize:18, alignSelf:'center' }}>›</div>
+            {['power','technique','speed','balance'].map(s => {
+              const v = Math.round(w.stats[s]);
+              const col = v >= 80 ? FM_GREEN : v >= 65 ? FM_ACCENT : v >= 45 ? FM_TEXT2 : FM_TEXT3;
+              return <span key={s} style={{ color:col, fontSize:12, fontWeight:700, textAlign:'center' }}>{v}</span>;
+            })}
+            <div style={{ textAlign:'center' }}>
+              <div style={{ color: w.injured ? FM_RED : FM_ACCENT, fontSize:14, fontWeight:700 }}>{eff}</div>
+              {(w.streak||0) !== 0 && <div style={{ color:(w.streak||0)>0?FM_GREEN:FM_RED, fontSize:8, fontWeight:600 }}>{(w.streak||0)>0?`▲${w.streak}`:`▼${Math.abs(w.streak)}`}</div>}
+            </div>
           </div>
         );
       })}
@@ -2095,94 +2122,128 @@ export default function App() {
 
   const TACTIC_ABBREVS = { power:'TEPPŌ', technique:'SHIKO', balanced:'MŌSŌ', light:'BUTSU', intensive:'SANBAN' };
 
+  const STAT_GROWTH_LABELS = { power:'POWER', technique:'TECH', balance:'BAL', speed:'SPD', stamina:'STA' };
   const TrainScreen = (
-    <div style={{ padding:'0 0 88px' }}>
-      <Section label={lang === 'EN' ? 'DEFAULT TRAINING STYLE' : 'DEFAULT KEIKO STYLE (稽古)'}>
-        {TRAINING_POLICIES.map(p => (
-          <div key={p.id} onClick={() => setPolicy(p.id)} style={{ margin:'0 16px 6px', padding:'12px 14px', background: policy===p.id ? '#121228' : '#0d0d1c', borderRadius:12, border:`1px solid ${policy===p.id?GOLD:'#181830'}`, cursor:'pointer', boxShadow: policy===p.id ? '0 0 0 1px rgba(200,168,76,0.2), 0 4px 16px rgba(0,0,0,0.4)' : 'none' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
-              <span style={{ color: policy===p.id ? GOLD : '#9898b8', fontSize:14, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{p.name}</span>
-              {policy===p.id && <span style={{ color:GOLD, fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>● STABLE DEFAULT</span>}
-            </div>
-            <div style={{ color:'#444', fontSize:11, fontFamily:'JetBrains Mono,monospace', marginBottom:6 }}>{p.desc}</div>
-            <div style={{ display:'flex', gap:14, flexWrap:'wrap' }}>
-              <span style={{ color: p.fatigue > 0 ? RED : GREEN, fontSize:11, fontFamily:'JetBrains Mono,monospace' }}>FAT {p.fatigue>0?'+':''}{p.fatigue}</span>
-              <span style={{ color: p.morale > 0 ? GREEN : p.morale < 0 ? RED : '#444', fontSize:11, fontFamily:'JetBrains Mono,monospace' }}>MOR {p.morale>0?'+':''}{p.morale}</span>
-              {p.injuryRisk && <span style={{ color:ORANGE, fontSize:11, fontFamily:'JetBrains Mono,monospace' }}>⚠ INJURY RISK</span>}
-            </div>
+    <div style={{ paddingBottom:24 }}>
+      {/* Active policy summary banner */}
+      <div style={{ padding:'10px 14px', background:FM_SURFACE, borderBottom:`1px solid ${FM_BORDER}`, display:'flex', alignItems:'center', gap:10 }}>
+        <div style={{ flex:1 }}>
+          <div style={{ color:FM_TEXT3, fontSize:9, letterSpacing:1, marginBottom:2 }}>STABLE DEFAULT</div>
+          <div style={{ color:FM_TEXT, fontSize:13, fontWeight:700 }}>{pol.name}</div>
+        </div>
+        <div style={{ display:'flex', gap:8 }}>
+          <div style={{ padding:'4px 8px', background: pol.fatigue > 0 ? `${FM_RED}22` : `${FM_GREEN}22`, borderRadius:5, border:`1px solid ${pol.fatigue > 0 ? FM_RED+'44' : FM_GREEN+'44'}` }}>
+            <div style={{ color:FM_TEXT3, fontSize:8 }}>FATIGUE</div>
+            <div style={{ color: pol.fatigue > 0 ? FM_RED : FM_GREEN, fontSize:11, fontWeight:700 }}>{pol.fatigue > 0 ? `+${pol.fatigue}` : pol.fatigue}</div>
           </div>
-        ))}
+          <div style={{ padding:'4px 8px', background: pol.morale > 0 ? `${FM_GREEN}22` : pol.morale < 0 ? `${FM_RED}22` : `${FM_TEXT3}11`, borderRadius:5, border:`1px solid ${pol.morale > 0 ? FM_GREEN+'44' : pol.morale < 0 ? FM_RED+'44' : FM_BORDER}` }}>
+            <div style={{ color:FM_TEXT3, fontSize:8 }}>MORALE</div>
+            <div style={{ color: pol.morale > 0 ? FM_GREEN : pol.morale < 0 ? FM_RED : FM_TEXT3, fontSize:11, fontWeight:700 }}>{pol.morale > 0 ? `+${pol.morale}` : pol.morale || '—'}</div>
+          </div>
+        </div>
+      </div>
+
+      <Section label="TRAINING METHODOLOGY">
+        {TRAINING_POLICIES.map(p => {
+          const isActive = policy === p.id;
+          const gains = Object.entries(p.growth || {});
+          return (
+            <div key={p.id} onClick={() => setPolicy(p.id)}
+              style={{ margin:'0 14px 6px', padding:'12px', background: isActive ? FM_SURFACE2 : FM_SURFACE,
+                       borderRadius:8, border:`1px solid ${isActive ? FM_ACCENT+'66' : FM_BORDER}`, cursor:'pointer',
+                       borderLeft: isActive ? `3px solid ${FM_ACCENT}` : `3px solid transparent` }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:5 }}>
+                <div>
+                  <span style={{ color: isActive ? FM_TEXT : FM_TEXT2, fontSize:13, fontWeight:700 }}>{p.name}</span>
+                  {p.injuryRisk && <span style={{ marginLeft:8, color:FM_RED, fontSize:9, fontWeight:600 }}>⚠ INJURY RISK</span>}
+                </div>
+                {isActive && <span style={{ color:FM_ACCENT, fontSize:9, fontWeight:600 }}>● ACTIVE</span>}
+              </div>
+              <div style={{ color:FM_TEXT3, fontSize:11, marginBottom:7 }}>{p.desc}</div>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                <span style={{ color: p.fatigue > 0 ? FM_RED : FM_GREEN, fontSize:10, fontWeight:600, padding:'2px 6px', background: p.fatigue > 0 ? `${FM_RED}18` : `${FM_GREEN}18`, borderRadius:4 }}>
+                  FAT {p.fatigue > 0 ? '+' : ''}{p.fatigue}
+                </span>
+                <span style={{ color: p.morale > 0 ? FM_GREEN : p.morale < 0 ? FM_RED : FM_TEXT3, fontSize:10, fontWeight:600, padding:'2px 6px', background: p.morale > 0 ? `${FM_GREEN}18` : p.morale < 0 ? `${FM_RED}18` : `${FM_TEXT3}11`, borderRadius:4 }}>
+                  MOR {p.morale > 0 ? '+' : ''}{p.morale || '0'}
+                </span>
+                {gains.map(([stat, rate]) => (
+                  <span key={stat} style={{ color:FM_ACCENT, fontSize:10, padding:'2px 6px', background:`${FM_ACCENT}18`, borderRadius:4 }}>
+                    {STAT_GROWTH_LABELS[stat]||stat.slice(0,3).toUpperCase()} +{rate.toFixed(1)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </Section>
 
-      <Section label={lang === 'EN' ? 'STABLE CULTURE' : 'HEYA CULTURE (部屋の風土)'}>
-        {DISCIPLINE_LEVELS.map(d => (
-          <div key={d.id} onClick={() => setDisc(d.id)} style={{ margin:'0 16px 6px', padding:'12px 14px', background: discipline===d.id ? '#121228' : '#0d0d1c', borderRadius:12, border:`1px solid ${discipline===d.id?GOLD:'#181830'}`, cursor:'pointer' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
-              <span style={{ color: discipline===d.id ? GOLD : '#9898b8', fontSize:14, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{d.name}</span>
-              {discipline===d.id && <span style={{ color:GOLD, fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>● ACTIVE</span>}
-            </div>
-            <div style={{ color:'#444', fontSize:11, fontFamily:'JetBrains Mono,monospace', marginBottom:6 }}>{d.desc}</div>
-            <div style={{ display:'flex', gap:14 }}>
-              <span style={{ color: d.moraleEff > 0 ? GREEN : d.moraleEff < 0 ? RED : '#444', fontSize:11, fontFamily:'JetBrains Mono,monospace' }}>MOR {d.moraleEff>0?'+':''}{d.moraleEff}</span>
-              <span style={{ color: d.discEff > 0 ? GREEN : d.discEff < 0 ? RED : '#444', fontSize:11, fontFamily:'JetBrains Mono,monospace' }}>DISC {d.discEff>0?'+':''}{d.discEff}</span>
-            </div>
-          </div>
-        ))}
+      <Section label="STABLE CULTURE">
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, margin:'0 14px' }}>
+          {DISCIPLINE_LEVELS.map(d => {
+            const isActive = discipline === d.id;
+            return (
+              <div key={d.id} onClick={() => setDisc(d.id)}
+                style={{ padding:'10px 12px', background: isActive ? FM_SURFACE2 : FM_SURFACE,
+                         borderRadius:8, border:`1px solid ${isActive ? FM_INDIGO+'66' : FM_BORDER}`, cursor:'pointer' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                  <span style={{ color: isActive ? FM_TEXT : FM_TEXT2, fontSize:12, fontWeight:700 }}>{d.name}</span>
+                  {isActive && <span style={{ width:6, height:6, borderRadius:'50%', background:FM_INDIGO, display:'inline-block' }} />}
+                </div>
+                <div style={{ color:FM_TEXT3, fontSize:10, marginBottom:6 }}>{d.desc}</div>
+                <div style={{ display:'flex', gap:6 }}>
+                  <span style={{ color: d.moraleEff > 0 ? FM_GREEN : d.moraleEff < 0 ? FM_RED : FM_TEXT3, fontSize:10, fontWeight:600 }}>MOR{d.moraleEff > 0 ? '+' : ''}{d.moraleEff}</span>
+                  <span style={{ color: d.discEff > 0 ? FM_GREEN : d.discEff < 0 ? FM_RED : FM_TEXT3, fontSize:10, fontWeight:600 }}>DISC{d.discEff > 0 ? '+' : ''}{d.discEff}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </Section>
 
-      <Section label={lang === 'EN' ? 'TRAINING ASSIGNMENT' : 'RIKISHI KEIKO ASSIGNMENT (力士稽古)'}>
-        <div style={{ margin:'0 16px 4px', padding:'6px 10px', background:'#0a0a18', borderRadius:8, border:'1px solid #181830' }}>
-          <span style={{ color:'#2e2e50', fontSize:9, fontFamily:'JetBrains Mono,monospace', letterSpacing:2 }}>ASSIGN INDIVIDUAL KEIKO · TAP TO OVERRIDE · ↺ = USING DEFAULT</span>
+      <Section label="INDIVIDUAL ASSIGNMENTS">
+        <div style={{ margin:'0 14px 4px', padding:'6px 10px', background:`${FM_ACCENT}0a`, borderRadius:6, border:`1px solid ${FM_BORDER}` }}>
+          <span style={{ color:FM_TEXT3, fontSize:9, letterSpacing:1 }}>Tap to override default · ↺ = using stable default</span>
         </div>
         {wrestlers.map(w => {
           const wPol = wrestlerPolicies[w.id] || null;
           const activePol = wPol || policy;
           return (
-            <div key={w.id} style={{ margin:'0 16px 8px', padding:'10px 12px', background:'#0d0d1c', borderRadius:10, border:`1px solid ${w.injured?'#2a1010':'#181830'}` }}>
+            <div key={w.id} style={{ margin:'0 14px 6px', padding:'10px 12px', background:FM_SURFACE, borderRadius:8, border:`1px solid ${w.injured ? FM_RED+'33' : FM_BORDER}` }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <div style={{ width:6, height:6, borderRadius:'50%', background: PERSONALITY_COLORS[w.personality] || '#555', flexShrink:0 }} />
-                  <span style={{ color: w.injured ? '#6a3030' : '#c0c0d8', fontSize:13, fontFamily:'Noto Serif JP,serif' }}>{w.name}</span>
+                <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+                  <div style={{ width:7, height:7, borderRadius:'50%', background: PERSONALITY_COLORS[w.personality] || FM_TEXT3, flexShrink:0 }} />
+                  <span style={{ color: w.injured ? FM_RED : FM_TEXT, fontSize:13, fontWeight:600 }}>{w.name}</span>
+                  {wPol && <span style={{ color:FM_INDIGO, fontSize:9, fontWeight:600 }}>OVERRIDE</span>}
                 </div>
                 {w.injured
-                  ? <span style={{ color:RED, fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>INJURED</span>
+                  ? <span style={{ color:FM_RED, fontSize:10, fontWeight:600 }}>INJURED</span>
                   : <div style={{ display:'flex', gap:8 }}>
-                      <span style={{ color: w.condition.fatigue>70 ? RED : '#444', fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>F:{Math.round(w.condition.fatigue)}</span>
-                      <span style={{ color: w.condition.morale<40 ? RED : '#444', fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>M:{Math.round(w.condition.morale)}</span>
+                      <span style={{ color: w.condition.fatigue>70 ? FM_RED : FM_TEXT3, fontSize:10 }}>F:{Math.round(w.condition.fatigue)}</span>
+                      <span style={{ color: w.condition.morale<40 ? FM_RED : FM_TEXT3, fontSize:10 }}>M:{Math.round(w.condition.morale)}</span>
                     </div>
                 }
               </div>
-              {/* Policy picker row */}
               <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
                 {TRAINING_POLICIES.map(p => {
                   const isActive = activePol === p.id;
                   const isOverride = wPol === p.id;
                   return (
                     <button key={p.id} onClick={() => {
-                      if (wPol === p.id) {
-                        // Already overridden to this: clear override
-                        setWrestlerPolicies(prev => { const n = {...prev}; delete n[w.id]; return n; });
-                      } else {
-                        setWrestlerPolicies(prev => ({ ...prev, [w.id]: p.id }));
-                      }
+                      if (wPol === p.id) setWrestlerPolicies(prev => { const n = {...prev}; delete n[w.id]; return n; });
+                      else setWrestlerPolicies(prev => ({ ...prev, [w.id]: p.id }));
                     }} style={{
-                      background: isActive ? (isOverride ? '#18182a' : '#121218') : '#0a0a14',
-                      border: `1px solid ${isActive ? (isOverride ? GOLD : '#3a3a60') : '#181828'}`,
-                      borderRadius: 6, padding: '4px 7px',
-                      color: isActive ? (isOverride ? GOLD : '#6060a0') : '#2a2a40',
-                      fontFamily: 'JetBrains Mono,monospace', fontSize: 9, cursor: 'pointer',
-                      fontWeight: isActive ? 700 : 400,
+                      background: isActive ? (isOverride ? FM_SURFACE2 : `${FM_ACCENT}18`) : FM_BG,
+                      border: `1px solid ${isActive ? (isOverride ? FM_INDIGO+'66' : FM_ACCENT+'44') : FM_BORDER}`,
+                      borderRadius:5, padding:'4px 8px',
+                      color: isActive ? (isOverride ? FM_INDIGO : FM_ACCENT) : FM_TEXT3,
+                      fontSize:9, cursor:'pointer', fontWeight: isActive ? 700 : 400,
                     }}>
                       {isActive && !isOverride ? '↺ ' : ''}{TACTIC_ABBREVS[p.id] || p.id.toUpperCase().slice(0,5)}
                     </button>
                   );
                 })}
               </div>
-              {wPol && (
-                <div style={{ color:'#3a4a2a', fontFamily:'JetBrains Mono,monospace', fontSize:9, marginTop:4 }}>
-                  ↳ OVERRIDE: {TRAINING_POLICIES.find(p=>p.id===wPol)?.name}
-                </div>
-              )}
             </div>
           );
         })}
@@ -2190,43 +2251,78 @@ export default function App() {
     </div>
   );
 
+  const POTENTIAL_META = {
+    'Elite':  { stars:5, color:FM_AMBER,  bg:`${FM_AMBER}18`,  border:`${FM_AMBER}55`  },
+    'High':   { stars:4, color:FM_GREEN,  bg:`${FM_GREEN}15`,  border:`${FM_GREEN}44`  },
+    'Medium': { stars:3, color:FM_ACCENT, bg:`${FM_ACCENT}12`, border:`${FM_ACCENT}44` },
+    'Low':    { stars:2, color:FM_TEXT3,  bg:`${FM_TEXT3}0a`,  border:FM_BORDER       },
+  };
   const ScoutScreen = (
-    <div style={{ padding:'12px 16px 88px' }}>
-      <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, marginBottom:10 }}>{lang === 'EN' ? 'SCOUT REPORT' : 'SCOUT REPORT (スカウトレポート)'}</div>
-      {prospects.length === 0 && <div style={{ color:'#252540', fontFamily:'Noto Serif JP,serif', fontSize:14, fontStyle:'italic', padding:20, textAlign:'center' }}>No prospects. Check back next season.</div>}
-      {prospects.map(p => (
-        <Card key={p.id} style={{ marginBottom:10, padding:'14px' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-            <div>
-              <div style={{ color:'#d8d8f0', fontSize:15, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{p.name}</div>
-              <div style={{ color:'#333', fontSize:11, fontFamily:'JetBrains Mono,monospace', marginTop:2 }}>Age {p.age} · {p.personality}</div>
+    <div style={{ paddingBottom:24 }}>
+      {/* Header banner */}
+      <div style={{ padding:'10px 14px', background:FM_SURFACE, borderBottom:`1px solid ${FM_BORDER}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div>
+          <div style={{ color:FM_TEXT, fontSize:13, fontWeight:700 }}>Recruitment Pipeline</div>
+          <div style={{ color:FM_TEXT3, fontSize:10, marginTop:1 }}>{prospects.length} prospect{prospects.length !== 1 ? 's' : ''} scouted</div>
+        </div>
+        <div style={{ color:FM_TEXT3, fontSize:10 }}>Balance: <span style={{ color:FM_AMBER, fontWeight:700 }}>¥{(stable.funds/1000).toFixed(0)}k</span></div>
+      </div>
+
+      {prospects.length === 0 && (
+        <div style={{ color:FM_TEXT3, fontSize:13, fontStyle:'italic', padding:'40px 20px', textAlign:'center' }}>No prospects available. Check back next season.</div>
+      )}
+
+      <div style={{ padding:'12px 14px 0' }}>
+        {prospects.map(p => {
+          const meta = POTENTIAL_META[p.potential] || POTENTIAL_META['Low'];
+          const canRecruit = stable.funds >= p.cost;
+          const stars = '★'.repeat(meta.stars) + '☆'.repeat(5 - meta.stars);
+          return (
+            <div key={p.id} style={{ marginBottom:10, background:FM_SURFACE, borderRadius:8, border:`1px solid ${FM_BORDER}`, overflow:'hidden' }}>
+              {/* Prospect header */}
+              <div style={{ padding:'12px 12px 8px', display:'flex', gap:10, alignItems:'flex-start' }}>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
+                    <span style={{ color:FM_TEXT, fontSize:14, fontWeight:700 }}>{p.name}</span>
+                    <span style={{ background:meta.bg, color:meta.color, border:`1px solid ${meta.border}`, borderRadius:4, padding:'1px 6px', fontSize:9, fontWeight:700 }}>{p.potential.toUpperCase()}</span>
+                  </div>
+                  <div style={{ color:FM_TEXT3, fontSize:10, marginBottom:4 }}>Age {p.age} · {p.personality} · {p.kimarite}</div>
+                  <div style={{ color:meta.color, fontSize:13, letterSpacing:1 }}>{stars}</div>
+                </div>
+                <div style={{ textAlign:'right', flexShrink:0 }}>
+                  <div style={{ color:FM_ACCENT, fontSize:22, fontWeight:700 }}>{p.rating}</div>
+                  <div style={{ color:FM_TEXT3, fontSize:9 }}>RATING</div>
+                </div>
+              </div>
+              {/* Attribute row */}
+              <div style={{ display:'flex', borderTop:`1px solid ${FM_BORDER}`, borderBottom:`1px solid ${FM_BORDER}` }}>
+                {Object.entries(p.stats).map(([s, v]) => {
+                  const vr = Math.round(v);
+                  const col = vr >= 70 ? FM_GREEN : vr >= 55 ? FM_ACCENT : FM_TEXT3;
+                  return (
+                    <div key={s} style={{ flex:1, textAlign:'center', padding:'6px 2px' }}>
+                      <div style={{ color:FM_TEXT3, fontSize:8, marginBottom:2 }}>{s.slice(0,3).toUpperCase()}</div>
+                      <div style={{ color:col, fontSize:12, fontWeight:700 }}>{vr}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Recruit button */}
+              <div style={{ padding:'8px 12px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ color:FM_TEXT3, fontSize:10 }}>Signing fee</span>
+                <button onClick={() => recruit(p)} style={{
+                  background: canRecruit ? FM_ACCENT : FM_BORDER,
+                  color: canRecruit ? '#fff' : FM_TEXT3,
+                  border:'none', borderRadius:6, padding:'7px 16px',
+                  fontSize:11, fontWeight:700, cursor: canRecruit ? 'pointer' : 'not-allowed',
+                }}>
+                  {canRecruit ? '+ SIGN' : 'FUNDS LOW'} · ¥{p.cost.toLocaleString()}
+                </button>
+              </div>
             </div>
-            <div style={{ textAlign:'right' }}>
-              <div style={{ color:GOLD, fontSize:24, fontWeight:700, fontFamily:'JetBrains Mono,monospace' }}>{p.rating}</div>
-              <div style={{ color:'#2e2e50', fontSize:9, fontFamily:'JetBrains Mono,monospace' }}>SCOUT</div>
-            </div>
-          </div>
-          <div style={{ display:'flex', gap:8, marginBottom:2, flexWrap:'wrap' }}>
-            {Object.entries(p.stats).map(([s,v]) => (
-              <span key={s} style={{ color:'#444', fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>{s.slice(0,3).toUpperCase()}:{Math.round(v)}</span>
-            ))}
-          </div>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10 }}>
-            <span style={{
-              display:'inline-flex', alignItems:'center', gap:4,
-              padding:'3px 8px', borderRadius:10,
-              fontSize:11, fontFamily:'JetBrains Mono,monospace', fontWeight:700,
-              color: p.potential==='Elite'?GOLD:p.potential==='High'?GREEN:p.potential==='Medium'?'#4a88cc':'#555',
-              border: `1px solid ${p.potential==='Elite'?'rgba(200,168,76,0.4)':p.potential==='High'?'rgba(68,204,102,0.4)':p.potential==='Medium'?'rgba(74,136,204,0.4)':'rgba(85,85,85,0.3)'}`,
-              boxShadow: p.potential==='Elite'?'0 0 8px rgba(200,168,76,0.25)':'none',
-              background: p.potential==='Elite'?'rgba(200,168,76,0.06)':'transparent',
-            }}>◆ {p.potential.toUpperCase()}</span>
-            <button onClick={() => recruit(p)} style={{ background: stable.funds>=p.cost ? GOLD : '#1e1e30', color: stable.funds>=p.cost ? '#0a0a0f' : '#333', border:'none', borderRadius:8, padding:'8px 18px', fontFamily:'JetBrains Mono,monospace', fontSize:11, fontWeight:700, cursor: stable.funds>=p.cost ? 'pointer' : 'not-allowed', letterSpacing:1 }}>
-              ¥{p.cost.toLocaleString()}
-            </button>
-          </div>
-        </Card>
-      ))}
+          );
+        })}
+      </div>
     </div>
   );
 
@@ -2237,71 +2333,78 @@ export default function App() {
   ];
 
   const BashoScreen = bashoResults ? (
-    // Post-basho results screen
-    <div style={{ padding:'24px 16px 88px' }}>
-      <div style={{ textAlign:'center', marginBottom:20 }}>
-        <div style={{ color:GOLD, fontSize:20, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{bashoResults.name}</div>
-        <div style={{ color:'#333', fontFamily:'JetBrains Mono,monospace', fontSize:10, letterSpacing:3 }}>BASHO COMPLETE · BANZUKE UPDATE</div>
+    // Post-basho results
+    <div style={{ padding:'16px 14px 32px' }}>
+      <div style={{ textAlign:'center', marginBottom:16 }}>
+        <div style={{ color:FM_AMBER, fontSize:18, fontWeight:700 }}>{bashoResults.name}</div>
+        <div style={{ color:FM_TEXT3, fontSize:10, letterSpacing:2, marginTop:2 }}>BASHO COMPLETE · BANZUKE UPDATED</div>
       </div>
       {bashoResults.enteredWrestlers.map(w => {
         const res = bashoResults.results[w.id];
         if (!res) return null;
+        const kachi = res.kachiKoshi;
         return (
-          <Card key={w.id} elevated style={{ marginBottom:12, padding:'16px 14px' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
+          <div key={w.id} style={{ marginBottom:10, background:FM_SURFACE, borderRadius:8, border:`1px solid ${kachi ? FM_GREEN+'44' : FM_RED+'33'}`, overflow:'hidden' }}>
+            <div style={{ padding:'12px', display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
               <div>
-                <div style={{ color:'#d8d8f0', fontSize:14, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{w.name}</div>
-                <div style={{ color:'#333', fontSize:10, fontFamily:'JetBrains Mono,monospace', marginTop:2 }}>
-                  {res.oldRank} → <span style={{ color: res.kachiKoshi ? GREEN : RED }}>{res.newRank}</span>
+                <div style={{ color:FM_TEXT, fontSize:14, fontWeight:700 }}>{w.name}</div>
+                <div style={{ color:FM_TEXT3, fontSize:10, marginTop:2 }}>
+                  {res.oldRank} → <span style={{ color: kachi ? FM_GREEN : FM_RED, fontWeight:700 }}>{res.newRank}</span>
                 </div>
               </div>
-              <div style={{ textAlign:'right' }}>
-                <div style={{ color: res.kachiKoshi ? GREEN : RED, fontSize:22, fontWeight:700, fontFamily:'JetBrains Mono,monospace' }}>{res.wins}W–{res.losses}L</div>
-              </div>
+              <div style={{ color: kachi ? FM_GREEN : FM_RED, fontSize:20, fontWeight:700 }}>{res.wins}W–{res.losses}L</div>
             </div>
-            <div style={{
-              padding:'8px 14px', borderRadius:8, textAlign:'center',
-              background: res.kachiKoshi ? 'rgba(68,204,102,0.06)' : 'rgba(232,64,64,0.06)',
-              border: `1px solid ${res.kachiKoshi ? 'rgba(68,204,102,0.3)' : 'rgba(232,64,64,0.3)'}`,
-            }}>
-              <div style={{ color: res.kachiKoshi ? GREEN : RED, fontSize:16, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>
-                {res.kachiKoshi
-                  ? (lang === 'EN' ? 'KACHI-KOSHI — MAJORITY WINS' : '勝ち越し KACHI-KOSHI')
-                  : (lang === 'EN' ? 'MAKE-KOSHI — MAJORITY LOSSES' : '負け越し MAKE-KOSHI')}
-              </div>
-              <div style={{ color:'#444', fontSize:10, fontFamily:'JetBrains Mono,monospace', marginTop:2 }}>
-                {res.kachiKoshi ? 'MAJORITY WINS — PROMOTED' : 'MAJORITY LOSSES — DEMOTED'}
-              </div>
+            <div style={{ padding:'8px 12px', background: kachi ? `${FM_GREEN}12` : `${FM_RED}10`, borderTop:`1px solid ${kachi ? FM_GREEN+'33' : FM_RED+'22'}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span style={{ color: kachi ? FM_GREEN : FM_RED, fontSize:12, fontWeight:700 }}>
+                {kachi ? (lang==='EN' ? '勝ち越し — PROMOTED' : '勝ち越し KACHI-KOSHI') : (lang==='EN' ? '負け越し — DEMOTED' : '負け越し MAKE-KOSHI')}
+              </span>
+              <span style={{ color: kachi ? FM_GREEN : FM_RED, fontSize:14 }}>{kachi ? '▲' : '▼'}</span>
             </div>
-          </Card>
+          </div>
         );
       })}
-      <button onClick={() => setBashoResults(null)} style={{ width:'100%', marginTop:4, background:GOLD, color:'#0a0a0f', border:'none', borderRadius:12, padding:'14px', fontFamily:'JetBrains Mono,monospace', fontSize:13, fontWeight:700, cursor:'pointer', letterSpacing:2 }}>
-        RETURN TO HEYA
+      <button onClick={() => setBashoResults(null)} style={{ width:'100%', marginTop:8, background:FM_ACCENT, color:'#fff', border:'none', borderRadius:8, padding:'14px', fontSize:13, fontWeight:700, cursor:'pointer', letterSpacing:1 }}>
+        RETURN TO OVERVIEW
       </button>
     </div>
   ) : !basho ? (
     // Pre-basho lobby
-    <div style={{ padding:'40px 16px 88px', textAlign:'center' }}>
-      <div style={{ color:GOLD, fontSize:28, fontFamily:'Noto Serif JP,serif', fontWeight:700, marginBottom:4 }}>
-        {(() => { const names = ['Hatsu 初場所','Haru 春場所','Natsu 夏場所','Nagoya 名古屋場所','Aki 秋場所','Kyushu 九州場所']; const idx = BASHO_MONTHS.indexOf(stable.month); return idx !== -1 ? names[idx] : 'Grand Tournament'; })()}
+    <div style={{ paddingBottom:24 }}>
+      {/* Tournament header */}
+      <div style={{ padding:'20px 14px 16px', background:`linear-gradient(135deg,${FM_SURFACE},${FM_SURFACE2})`, borderBottom:`1px solid ${FM_BORDER}`, textAlign:'center' }}>
+        <div style={{ color:FM_AMBER, fontSize:24, fontWeight:700, marginBottom:4 }}>
+          {(() => { const names = ['Hatsu 初場所','Haru 春場所','Natsu 夏場所','Nagoya 名古屋場所','Aki 秋場所','Kyushu 九州場所']; const idx = BASHO_MONTHS.indexOf(stable.month); return idx !== -1 ? names[idx] : 'Grand Tournament'; })()}
+        </div>
+        <div style={{ color:FM_TEXT3, fontSize:11, letterSpacing:2, marginBottom:4 }}>15-DAY GRAND TOURNAMENT</div>
+        <div style={{ color:FM_TEXT2, fontSize:12, lineHeight:1.6 }}>
+          Each rikishi fights one bout per day. Choose tactics before each bout.
+        </div>
       </div>
-      <div style={{ color:'#333', fontFamily:'JetBrains Mono,monospace', fontSize:11, letterSpacing:2, marginBottom:8 }}>15 DAYS · RYŌGOKU KOKUGIKAN</div>
-      <div style={{ color:'#555', fontSize:13, fontFamily:'Noto Serif JP,serif', marginBottom:12, lineHeight:1.6 }}>
-        Your rikishi compete one bout per day. Choose a tactical approach before each fight.
-      </div>
-      <div style={{ margin:'0 0 28px', padding:'12px', background:'#0d0d1c', borderRadius:10, border:'1px solid #1a1a36', textAlign:'left' }}>
-        <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, marginBottom:8 }}>ENTERING RIKISHI</div>
+      {/* Roster entering */}
+      <Section label="ENTERING SQUAD">
         {wrestlers.filter(w => !w.injured).slice(0, 4).map(w => (
-          <div key={w.id} style={{ display:'flex', justifyContent:'space-between', padding:'4px 0', borderBottom:'1px solid #141428' }}>
-            <span style={{ color:'#c0c0d8', fontFamily:'Noto Serif JP,serif', fontSize:13 }}>{w.name}</span>
-            <span style={{ color:'#444', fontFamily:'JetBrains Mono,monospace', fontSize:10 }}>{w.rank}</span>
+          <div key={w.id} style={{ margin:'0 14px 6px', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 12px', background:FM_SURFACE, borderRadius:8, border:`1px solid ${FM_BORDER}` }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <RankBadge rank={w.rank} size={12} />
+              <div>
+                <div style={{ color:FM_TEXT, fontSize:13, fontWeight:600 }}>{w.name}</div>
+                <div style={{ color:FM_TEXT3, fontSize:9 }}>{w.rank}</div>
+              </div>
+            </div>
+            <div style={{ color:FM_ACCENT, fontSize:14, fontWeight:700 }}>{Math.round(calcEffective(w))}</div>
           </div>
         ))}
+        {wrestlers.filter(w => w.injured).length > 0 && (
+          <div style={{ margin:'0 14px 6px', padding:'6px 12px', background:`${FM_RED}0a`, borderRadius:6, border:`1px solid ${FM_RED}22` }}>
+            <span style={{ color:FM_RED, fontSize:10 }}>{wrestlers.filter(w=>w.injured).length} wrestler(s) injured and unable to compete</span>
+          </div>
+        )}
+      </Section>
+      <div style={{ padding:'8px 14px 0' }}>
+        <button onClick={startBasho} style={{ width:'100%', background:FM_ACCENT, color:'#fff', border:'none', borderRadius:8, padding:'15px', fontSize:14, fontWeight:700, cursor:'pointer', letterSpacing:1 }}>
+          ◆ BEGIN BASHO
+        </button>
       </div>
-      <button onClick={startBasho} style={{ background:GOLD, color:'#0a0a0f', border:'none', borderRadius:12, padding:'16px 42px', fontFamily:'JetBrains Mono,monospace', fontSize:14, fontWeight:700, cursor:'pointer', letterSpacing:3 }}>
-        ⛩ BEGIN BASHO
-      </button>
     </div>
   ) : (
     // Active basho — day-by-day
@@ -2314,145 +2417,155 @@ export default function App() {
       const isLastDay = basho.currentDay === 15;
 
       return (
-        <div style={{ padding:'12px 16px 88px' }}>
-          {/* Header */}
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:4 }}>
-            <div style={{ color:GOLD, fontSize:16, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{basho.name}</div>
-            <div style={{ color:GOLD, fontFamily:'JetBrains Mono,monospace', fontSize:13, fontWeight:700, letterSpacing:1 }}>DAY {basho.currentDay} / 15</div>
+        <div style={{ paddingBottom:24 }}>
+          {/* Basho header */}
+          <div style={{ padding:'10px 14px', background:FM_SURFACE, borderBottom:`1px solid ${FM_BORDER}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <div>
+              <div style={{ color:FM_TEXT, fontSize:13, fontWeight:700 }}>{basho.name}</div>
+              <div style={{ color:FM_TEXT3, fontSize:10, marginTop:1 }}>Day {basho.currentDay} of 15</div>
+            </div>
+            <div style={{ textAlign:'right' }}>
+              <div style={{ color:FM_AMBER, fontSize:18, fontWeight:700 }}>{basho.currentDay}/15</div>
+            </div>
           </div>
 
-          {/* 15-day progress bar */}
-          <div style={{ display:'flex', gap:2, marginBottom:12 }}>
+          {/* 15-day progress strip */}
+          <div style={{ display:'flex', gap:2, padding:'8px 14px 0' }}>
             {Array.from({length:15},(_,i) => {
               const day = basho.schedule[basho.enteredWrestlers[0]?.id]?.[i];
               const isToday = i === basho.currentDay - 1;
-              const bg = day?.result === 'win' ? GREEN : day?.result === 'loss' ? RED : isToday ? GOLD : '#1a1a30';
-              return <div key={i} style={{ flex:1, height: isToday ? 6 : 4, borderRadius:2, background:bg, transition:'all 0.2s' }} />;
+              const bg = day?.result === 'win' ? FM_GREEN : day?.result === 'loss' ? FM_RED : isToday ? FM_AMBER : FM_BORDER;
+              return <div key={i} style={{ flex:1, height: isToday ? 8 : 4, borderRadius:2, background:bg, transition:'all 0.2s' }} />;
             })}
           </div>
 
-          {/* Per-wrestler W-L tracks */}
-          {basho.enteredWrestlers.map(w => {
-            const days = basho.schedule[w.id];
-            const wins = days.filter(d => d.result === 'win').length;
-            const losses = days.filter(d => d.result === 'loss').length;
-            const completed = days.filter(d => d.result).length;
-            const kachi = wins > 8 || (completed === 15 && wins > losses);
-            return (
-              <div key={w.id} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6, padding:'6px 10px', background:'#0d0d1c', borderRadius:8, border:'1px solid #181830' }}>
-                <span style={{ color:'#8888a8', fontFamily:'Noto Serif JP,serif', fontSize:11, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{w.name}</span>
-                <div style={{ display:'flex', gap:2 }}>
-                  {days.map((d,i) => (
-                    <div key={i} style={{ width:7, height:7, borderRadius:1,
-                      background: d.result==='win' ? GREEN : d.result==='loss' ? RED : i===basho.currentDay-1 ? 'rgba(201,168,76,0.4)' : '#1a1a30'
-                    }} />
-                  ))}
+          {/* Wrestler standings */}
+          <div style={{ padding:'8px 14px 0', display:'flex', flexDirection:'column', gap:4 }}>
+            {basho.enteredWrestlers.map(w => {
+              const days = basho.schedule[w.id];
+              const wins = days.filter(d => d.result === 'win').length;
+              const losses = days.filter(d => d.result === 'loss').length;
+              const completed = days.filter(d => d.result).length;
+              const kachi = wins > 8 || (completed === 15 && wins > losses);
+              return (
+                <div key={w.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 10px', background:FM_SURFACE, borderRadius:7, border:`1px solid ${FM_BORDER}` }}>
+                  <span style={{ color:FM_TEXT2, fontSize:11, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{w.name}</span>
+                  <div style={{ display:'flex', gap:2 }}>
+                    {days.map((d,i) => (
+                      <div key={i} style={{ width:7, height:7, borderRadius:1,
+                        background: d.result==='win' ? FM_GREEN : d.result==='loss' ? FM_RED : i===basho.currentDay-1 ? `${FM_AMBER}66` : FM_BORDER
+                      }} />
+                    ))}
+                  </div>
+                  <span style={{ color: wins>losses?FM_GREEN:losses>wins?FM_RED:FM_TEXT3, fontSize:11, fontWeight:700, minWidth:36, textAlign:'right' }}>
+                    {wins}W-{losses}L
+                  </span>
+                  {kachi && <span style={{ color:FM_GREEN, fontSize:9, fontWeight:700 }}>勝</span>}
                 </div>
-                <span style={{ color: wins>losses?GREEN:losses>wins?RED:'#444', fontFamily:'JetBrains Mono,monospace', fontSize:11, fontWeight:700, minWidth:36, textAlign:'right' }}>
-                  {wins}W-{losses}L
-                </span>
-                {kachi && <span style={{ color:GREEN, fontSize:9, fontFamily:'JetBrains Mono,monospace' }}>勝</span>}
-              </div>
-            );
-          })}
-
-          {/* Today's bouts */}
-          <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, margin:'10px 0 8px' }}>
-            TODAY'S BOUTS — DAY {basho.currentDay}
+              );
+            })}
           </div>
 
-          {todayBouts.map(({ w, entry }) => (
-            <Card key={w.id} elevated={!!entry.result} selected={!entry.result} style={{ marginBottom:10, overflow:'hidden' }}>
-              <div style={{ padding:'12px 14px' }}>
-                {/* Matchup header */}
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
-                  <div>
-                    <div style={{ color:GOLD, fontSize:14, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{w.name}</div>
-                    <div style={{ color:'#333', fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>{w.rank}</div>
+          {/* Today's bouts */}
+          <Section label={`DAY ${basho.currentDay} · BOUTS`}>
+            {todayBouts.map(({ w, entry }) => (
+              <div key={w.id} style={{ margin:'0 14px 10px', background:FM_SURFACE, borderRadius:8, border:`1px solid ${!entry.result ? FM_ACCENT+'44' : FM_BORDER}`, overflow:'hidden' }}>
+                {/* Matchup */}
+                <div style={{ padding:'12px 12px 8px', display:'flex', alignItems:'center', gap:6 }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ color:FM_TEXT, fontSize:13, fontWeight:700 }}>{w.name}</div>
+                    <div style={{ color:FM_TEXT3, fontSize:9 }}>{w.rank}</div>
                   </div>
-                  <div style={{ color:'#2e2e50', fontFamily:'Noto Serif JP,serif', fontSize:12, alignSelf:'center', padding:'0 8px' }}>対</div>
-                  <div style={{ textAlign:'right' }}>
-                    <div style={{ color:RED, fontSize:14, fontFamily:'Noto Serif JP,serif', fontWeight:700 }}>{entry.opp.name}</div>
-                    <div style={{ color:'#333', fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>{entry.opp.rank}</div>
+                  <div style={{ color:FM_TEXT3, fontSize:12, padding:'0 6px' }}>対</div>
+                  <div style={{ flex:1, textAlign:'right' }}>
+                    <div style={{ color:FM_TEXT2, fontSize:13, fontWeight:600 }}>{entry.opp.name}</div>
+                    <div style={{ color:FM_TEXT3, fontSize:9 }}>{entry.opp.rank}</div>
                   </div>
                 </div>
 
-                {/* Tactic selector (only if not yet resolved) */}
+                {/* Tactic selector */}
                 {!entry.result && (
-                  <>
-                    <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:2, marginBottom:6 }}>CHOOSE YOUR APPROACH</div>
-                    <div style={{ display:'flex', gap:5, marginBottom:10 }}>
+                  <div style={{ padding:'0 12px 8px' }}>
+                    <div style={{ color:FM_TEXT3, fontSize:9, letterSpacing:1, marginBottom:6 }}>CHOOSE APPROACH</div>
+                    <div style={{ display:'flex', gap:5 }}>
                       {TACTIC_OPTIONS.map(t => {
                         const isChosen = entry.tactic === t.id;
                         return (
                           <button key={t.id} onClick={() => setTactic(w.id, t.id)} style={{
-                            flex:1, background: isChosen ? '#12122a' : '#0a0a14',
-                            border: `1px solid ${isChosen ? t.col : '#1a1a2e'}`,
-                            borderRadius:8, padding:'8px 4px', cursor:'pointer',
-                            boxShadow: isChosen ? `0 0 8px ${t.col}44` : 'none',
+                            flex:1, background: isChosen ? `${t.col}22` : FM_BG,
+                            border: `1px solid ${isChosen ? t.col+'88' : FM_BORDER}`,
+                            borderRadius:7, padding:'7px 4px', cursor:'pointer',
                           }}>
-                            <div style={{ color: isChosen ? t.col : '#3a3a50', fontSize:10, fontFamily:'JetBrains Mono,monospace', fontWeight:700, letterSpacing:1 }}>{t.label}</div>
-                            <div style={{ color:'#2e2e40', fontSize:8, fontFamily:'JetBrains Mono,monospace', marginTop:2 }}>{t.sub}</div>
+                            <div style={{ color: isChosen ? t.col : FM_TEXT3, fontSize:9, fontWeight: isChosen ? 700 : 400, letterSpacing:0.5 }}>{t.label}</div>
+                            <div style={{ color:FM_TEXT3, fontSize:8, marginTop:2 }}>{t.sub}</div>
                           </button>
                         );
                       })}
                     </div>
-                  </>
+                  </div>
                 )}
 
-                {/* Action buttons */}
-                <div style={{ display:'flex', gap:8 }}>
+                {/* Actions */}
+                <div style={{ display:'flex', gap:6, padding:'0 12px 12px' }}>
                   {!entry.result ? (
                     <>
-                      <button onClick={() => watchDayBout(w, entry)} disabled={!entry.tactic} style={{ flex:2, background: entry.tactic ? '#12122a' : '#0a0a18', border:`1px solid ${entry.tactic?'#26265a':'#141428'}`, borderRadius:8, padding:'9px 0', color: entry.tactic ? '#7878cc' : '#2a2a40', fontFamily:'JetBrains Mono,monospace', fontSize:12, cursor: entry.tactic ? 'pointer' : 'not-allowed', fontWeight:700, letterSpacing:1 }}>
-                        WATCH
+                      <button onClick={() => watchDayBout(w, entry)} disabled={!entry.tactic}
+                        style={{ flex:2, background: entry.tactic ? FM_INDIGO : FM_BORDER, color: entry.tactic ? '#fff' : FM_TEXT3,
+                                 border:'none', borderRadius:7, padding:'9px 0', fontSize:12, fontWeight:700, cursor: entry.tactic ? 'pointer' : 'not-allowed' }}>
+                        ▶ WATCH
                       </button>
-                      <button onClick={() => autoDayBout(w, entry)} style={{ flex:1, background:'#0d0d14', border:'1px solid #1a1a24', borderRadius:8, padding:'9px 0', color:'#3a3a54', fontFamily:'JetBrains Mono,monospace', fontSize:11, cursor:'pointer', letterSpacing:1 }}>
+                      <button onClick={() => autoDayBout(w, entry)}
+                        style={{ flex:1, background:FM_BORDER2, color:FM_TEXT3, border:'none', borderRadius:7, padding:'9px 0', fontSize:11, cursor:'pointer' }}>
                         AUTO
                       </button>
                     </>
                   ) : (
                     <>
-                      <button onClick={() => watchDayBout(w, entry)} style={{ flex:1, background:'#0d0d1c', border:'1px solid #1a1a30', borderRadius:8, padding:'9px 0', color:'#5050a0', fontFamily:'JetBrains Mono,monospace', fontSize:11, cursor:'pointer', letterSpacing:1 }}>REPLAY</button>
-                      <div style={{ flex:2, borderRadius:8, padding:'9px 0', textAlign:'center', background: entry.result==='win'?'#0a1a0a':'#1a0a0a', border:`1px solid ${entry.result==='win'?'#2a4a2a':'#4a2a2a'}`, color: entry.result==='win'?GREEN:RED, fontFamily:'JetBrains Mono,monospace', fontSize:13, fontWeight:700, letterSpacing:2 }}>
+                      <button onClick={() => watchDayBout(w, entry)}
+                        style={{ flex:1, background:FM_BORDER2, color:FM_TEXT2, border:'none', borderRadius:7, padding:'9px 0', fontSize:11, cursor:'pointer' }}>REPLAY</button>
+                      <div style={{ flex:2, borderRadius:7, padding:'9px 0', textAlign:'center',
+                                    background: entry.result==='win' ? `${FM_GREEN}18` : `${FM_RED}14`,
+                                    border: `1px solid ${entry.result==='win' ? FM_GREEN+'44' : FM_RED+'33'}`,
+                                    color: entry.result==='win' ? FM_GREEN : FM_RED, fontSize:13, fontWeight:700 }}>
                         {entry.result === 'win' ? '✓ WIN' : '✗ LOSS'}
-                        {entry.boutData?.kimarite && <span style={{ color:'#2a3a2a', fontSize:9, display:'block', letterSpacing:1 }}>{entry.boutData.kimarite}</span>}
+                        {entry.boutData?.kimarite && <span style={{ color:FM_TEXT3, fontSize:9, display:'block' }}>{entry.boutData.kimarite}</span>}
                       </div>
                     </>
                   )}
                 </div>
               </div>
-            </Card>
-          ))}
+            ))}
+          </Section>
 
           {/* Navigation */}
           {allTodayDone && (
-            isLastDay ? (
-              <button onClick={endBasho} style={{ width:'100%', marginTop:8, background:GOLD, color:'#0a0a0f', border:'none', borderRadius:12, padding:'14px', fontFamily:'JetBrains Mono,monospace', fontSize:13, fontWeight:700, cursor:'pointer', letterSpacing:2 }}>
-                END BASHO — SEE RESULTS
-              </button>
-            ) : (
-              <>
-                <button onClick={advanceDay} style={{ width:'100%', marginTop:8, background:'#12122a', border:`1px solid ${GOLD}`, color:GOLD, borderRadius:12, padding:'14px', fontFamily:'JetBrains Mono,monospace', fontSize:13, fontWeight:700, cursor:'pointer', letterSpacing:2 }}>
-                  DAY {basho.currentDay + 1} — TOMORROW →
+            <div style={{ padding:'0 14px' }}>
+              {isLastDay ? (
+                <button onClick={endBasho} style={{ width:'100%', background:FM_AMBER, color:FM_BG, border:'none', borderRadius:8, padding:'14px', fontSize:13, fontWeight:700, cursor:'pointer', letterSpacing:1 }}>
+                  END BASHO — RESULTS →
                 </button>
-                {/* Tomorrow's matchup preview */}
-                <div style={{ marginTop:10, padding:'10px 12px', background:'#0a0a14', borderRadius:8, border:'1px solid #14142a' }}>
-                  <div style={{ color:'#2e2e50', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:3, marginBottom:8 }}>TOMORROW'S MATCHUPS — DAY {basho.currentDay + 1}</div>
-                  {basho.enteredWrestlers.map(w => {
-                    const nextEntry = basho.schedule[w.id][basho.currentDay];
-                    if (!nextEntry) return null;
-                    return (
-                      <div key={w.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', borderBottom:'1px solid #0f0f20' }}>
-                        <span style={{ color:'#6060a0', fontFamily:'Noto Serif JP,serif', fontSize:11 }}>{w.name}</span>
-                        <span style={{ color:'#2a2a40', fontFamily:'JetBrains Mono,monospace', fontSize:9 }}>対</span>
-                        <span style={{ color:'#4a3030', fontFamily:'Noto Serif JP,serif', fontSize:11 }}>{nextEntry.opp.name} <span style={{ color:'#2a2a40', fontSize:9 }}>({nextEntry.opp.rank})</span></span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )
+              ) : (
+                <>
+                  <button onClick={advanceDay} style={{ width:'100%', background:FM_ACCENT, color:'#fff', border:'none', borderRadius:8, padding:'14px', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                    DAY {basho.currentDay + 1} — NEXT DAY →
+                  </button>
+                  <div style={{ marginTop:8, padding:'10px 12px', background:FM_SURFACE, borderRadius:8, border:`1px solid ${FM_BORDER}` }}>
+                    <div style={{ color:FM_TEXT3, fontSize:9, letterSpacing:1, marginBottom:6 }}>TOMORROW · DAY {basho.currentDay + 1}</div>
+                    {basho.enteredWrestlers.map(w => {
+                      const nextEntry = basho.schedule[w.id][basho.currentDay];
+                      if (!nextEntry) return null;
+                      return (
+                        <div key={w.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', borderBottom:`1px solid ${FM_BORDER}` }}>
+                          <span style={{ color:FM_TEXT2, fontSize:11 }}>{w.name}</span>
+                          <span style={{ color:FM_TEXT3, fontSize:9 }}>対</span>
+                          <span style={{ color:FM_TEXT3, fontSize:11 }}>{nextEntry.opp.name} <span style={{ fontSize:9 }}>({nextEntry.opp.rank})</span></span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
       );
@@ -2461,61 +2574,71 @@ export default function App() {
 
   // ── TABS ─────────────────────────────────────────────────────
   const TABS = [
-    { id:'stable', labelKey:'tab_stable', icon:'⛩' },
-    { id:'roster', labelKey:'tab_roster', icon:'👥' },
-    { id:'train',  labelKey:'tab_train',  icon:'⚡' },
-    { id:'scout',  labelKey:null,         icon:'🔭', label:'SCOUT' },
-    { id:'basho',  labelKey:'tab_basho',  icon:'🏆' },
+    { id:'stable', label:'OVERVIEW',  icon:'◉' },
+    { id:'roster', label:'SQUAD',     icon:'◈' },
+    { id:'train',  label:'TRAINING',  icon:'▲' },
+    { id:'scout',  label:'SCOUTING',  icon:'◎' },
+    { id:'basho',  label:'TOURNAMENT',icon:'◆' },
   ];
 
   const SCREENS = { stable: StableScreen, roster: RosterScreen, train: TrainScreen, scout: ScoutScreen, basho: BashoScreen };
 
   return (
     <>
-    <style>{`@keyframes pulseGlow{0%,100%{box-shadow:0 0 3px rgba(232,64,64,0.35)}50%{box-shadow:0 0 10px rgba(232,64,64,0.85),0 0 20px rgba(232,64,64,0.3)}}`}</style>
-    <div style={{ background:'#0a0a0f', minHeight:'100vh', maxWidth:430, margin:'0 auto', fontFamily:'DM Sans,system-ui,sans-serif', position:'relative' }}>
+    <style>{`
+      @keyframes pulseGlow{0%,100%{box-shadow:0 0 3px rgba(239,68,68,0.35)}50%{box-shadow:0 0 10px rgba(239,68,68,0.85),0 0 20px rgba(239,68,68,0.3)}}
+      ::-webkit-scrollbar{width:4px;height:4px}
+      ::-webkit-scrollbar-track{background:transparent}
+      ::-webkit-scrollbar-thumb{background:${FM_BORDER2};border-radius:2px}
+    `}</style>
+    <div style={{ background:FM_BG, minHeight:'100vh', maxWidth:430, margin:'0 auto', fontFamily:'DM Sans,system-ui,sans-serif', position:'relative' }}>
 
-      {/* Top bar */}
-      <div style={{ position:'sticky', top:0, zIndex:100, background:'rgba(10,10,15,0.96)', borderBottom:'1px solid #141430', backdropFilter:'blur(12px)', padding:'10px 16px' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <div>
-            <div style={{ color:GOLD, fontSize:15, fontWeight:700, fontFamily:'Noto Serif JP,serif' }}>{stable.name}</div>
-            <div style={{ color:'#282848', fontSize:9, fontFamily:'JetBrains Mono,monospace', letterSpacing:2, marginTop:1 }}>
-              {[stable.year, MONTHS[stable.month-1].toUpperCase(), String(stable.day).padStart(2,'0'), stable.time.toUpperCase()].map((seg, i) => (
-                <span key={i} style={{ padding:'1px 5px', borderRadius:3, background:'#0d0d1c', color: i === 3 ? GOLD : '#303058', fontFamily:'JetBrains Mono,monospace', fontSize:9, letterSpacing:1, marginRight:3, border:'1px solid #181836' }}>{seg}</span>
+      {/* ── Top bar ─────────────────────────────────────── */}
+      <div style={{ position:'sticky', top:0, zIndex:100, background:`${FM_BG}f5`, borderBottom:`1px solid ${FM_BORDER}`, backdropFilter:'blur(12px)' }}>
+        {/* Row 1: club info + actions */}
+        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px 8px' }}>
+          {/* Crest */}
+          <div style={{ width:32, height:32, borderRadius:8, background:`linear-gradient(135deg,${FM_ACCENT},${FM_INDIGO})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>⛩</div>
+          {/* Club + date */}
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ color:FM_TEXT, fontSize:13, fontWeight:700, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{stable.name}</div>
+            <div style={{ display:'flex', gap:4, marginTop:2 }}>
+              {[`${MONTHS[stable.month-1].slice(0,3).toUpperCase()} ${stable.year}`, stable.time].map((seg, i) => (
+                <span key={i} style={{ padding:'1px 6px', borderRadius:4, background:FM_SURFACE, color:FM_TEXT3, fontSize:9, letterSpacing:1, border:`1px solid ${FM_BORDER}` }}>{seg}</span>
               ))}
             </div>
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <div style={{ textAlign:'right' }}>
-              <div style={{ color: fundsFlash === 'up' ? '#44cc66' : fundsFlash === 'down' ? '#e84040' : GOLD, fontSize:13, fontWeight:700, fontFamily:'JetBrains Mono,monospace', transition:'color 0.15s' }}>¥{(stable.funds/1000).toFixed(0)}k</div>
-              <div style={{ color:'#282848', fontSize:9, fontFamily:'JetBrains Mono,monospace', letterSpacing:1 }}>FUNDS</div>
-            </div>
+          {/* Funds */}
+          <div style={{ textAlign:'right', flexShrink:0 }}>
+            <div style={{ color: fundsFlash === 'up' ? FM_GREEN : fundsFlash === 'down' ? FM_RED : FM_AMBER, fontSize:13, fontWeight:700, transition:'color 0.15s' }}>¥{(stable.funds/1000).toFixed(0)}k</div>
+            <div style={{ color:FM_TEXT3, fontSize:9, letterSpacing:1 }}>FUNDS</div>
+          </div>
+          {/* Lang + Advance */}
+          <div style={{ display:'flex', gap:6, flexShrink:0 }}>
             <button onClick={() => setLang(l => l === 'EN' ? 'JP' : 'EN')}
-                    style={{ background:'#0d0d1c', color:'#555', border:'1px solid #1a1a36', borderRadius:6, padding:'6px 8px', fontFamily:'JetBrains Mono,monospace', fontSize:9, cursor:'pointer', letterSpacing:1 }}>
-              🌐 {lang === 'EN' ? 'JP' : 'EN'}
+                    style={{ background:FM_SURFACE, color:FM_TEXT3, border:`1px solid ${FM_BORDER}`, borderRadius:6, padding:'5px 7px', fontSize:9, cursor:'pointer', letterSpacing:1 }}>
+              🌐
             </button>
-            <button onClick={advance} style={{ background:GOLD, color:'#0a0a0f', border:'none', borderRadius:8, padding:'8px 13px', fontFamily:'JetBrains Mono,monospace', fontSize:10, fontWeight:700, cursor:'pointer', letterSpacing:1, whiteSpace:'nowrap' }}>
+            <button onClick={advance} style={{ background:FM_ACCENT, color:'#fff', border:'none', borderRadius:7, padding:'7px 12px', fontSize:10, fontWeight:700, cursor:'pointer', letterSpacing:1, whiteSpace:'nowrap' }}>
               {T('advance_btn', lang)}
             </button>
           </div>
+        </div>
+        {/* Row 2: horizontal tab strip */}
+        <div style={{ display:'flex', overflowX:'auto', borderTop:`1px solid ${FM_BORDER}`, scrollbarWidth:'none' }}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => { setTab(t.id); setSelW(null); }}
+              style={{ flex:'0 0 auto', background:'none', border:'none', cursor:'pointer', padding:'8px 14px', display:'flex', alignItems:'center', gap:5, position:'relative', whiteSpace:'nowrap' }}>
+              <span style={{ fontSize:10, color: tab===t.id ? FM_ACCENT : FM_TEXT3 }}>{t.icon}</span>
+              <span style={{ fontSize:11, fontWeight: tab===t.id ? 700 : 400, color: tab===t.id ? FM_TEXT : FM_TEXT3, letterSpacing:0.5 }}>{t.label}</span>
+              {tab===t.id && <div style={{ position:'absolute', bottom:0, left:0, right:0, height:2, background:FM_ACCENT, borderRadius:'2px 2px 0 0' }} />}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Screen content */}
       {SCREENS[tab]}
-
-      {/* Bottom tab bar */}
-      <div style={{ position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:430, background:'rgba(10,10,15,0.97)', borderTop:'1px solid #141430', display:'flex', backdropFilter:'blur(12px)', paddingBottom:'env(safe-area-inset-bottom,6px)' }}>
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => { setTab(t.id); setSelW(null); }} style={{ flex:1, background:'none', border:'none', cursor:'pointer', padding:'8px 0 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-            <span style={{ fontSize:20 }}>{t.icon}</span>
-            <span style={{ fontSize:9, fontFamily:'JetBrains Mono,monospace', color: tab===t.id ? GOLD : '#282848', letterSpacing:1, fontWeight: tab===t.id ? 700 : 400 }}>
-              {(t.labelKey ? T(t.labelKey, lang) : t.label).toUpperCase()}
-            </span>
-          </button>
-        ))}
-      </div>
 
       {/* Fight Viewer modal */}
       {viewer && <FightViewer bout={viewer} onClose={() => setViewer(null)} kachiKoshi={viewer.kachiKoshi} lang={lang} />}
