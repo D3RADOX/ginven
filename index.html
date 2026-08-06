@@ -1,29 +1,87 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Inventory Exporter</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Create, save, and export a private inventory list.">
+  <title>Ginven Inventory Exporter</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="inventory.js" defer></script>
+  <script src="exporters.js" defer></script>
+  <script src="script.js" defer></script>
 </head>
 <body>
-  <main>
-    <h1>Inventory Entry</h1>
-    <form id="inventory-form">
-      <input type="text" id="item-name" placeholder="Item name" required />
-      <input type="number" id="item-quantity" placeholder="Quantity" min="1" required />
-      <button type="submit">Add Item</button>
-    </form>
+  <main class="app-shell">
+    <header class="app-header">
+      <p class="eyebrow">GINVEN</p>
+      <h1>Inventory Exporter</h1>
+      <p class="intro">Build a private inventory list, keep it on this device, and export real Excel, Word, or HTML files.</p>
+    </header>
 
-    <ul id="inventory-list"></ul>
+    <section class="panel" aria-labelledby="entry-heading">
+      <h2 id="entry-heading">Add an item</h2>
+      <form id="inventory-form" novalidate>
+        <div class="form-grid">
+          <div class="field field-name">
+            <label for="item-name">Item name</label>
+            <input
+              type="text"
+              id="item-name"
+              name="item-name"
+              maxlength="120"
+              autocomplete="off"
+              aria-describedby="name-help"
+              required
+            >
+            <small id="name-help">Up to 120 characters.</small>
+          </div>
 
-    <div class="export-buttons">
-      <button onclick="exportAsExcel()">Export as XLSX</button>
-      <button onclick="exportAsDoc()">Export as DOC</button>
-      <button onclick="exportAsHTML()">Export as HTML</button>
-    </div>
+          <div class="field field-quantity">
+            <label for="item-quantity">Quantity</label>
+            <input
+              type="number"
+              id="item-quantity"
+              name="item-quantity"
+              min="1"
+              max="1000000000"
+              step="1"
+              inputmode="numeric"
+              required
+            >
+          </div>
+        </div>
+
+        <button id="add-item-button" class="primary-button" type="submit">Add item</button>
+        <p id="form-error" class="message message-error" role="alert" hidden></p>
+      </form>
+    </section>
+
+    <section class="panel inventory-panel" aria-labelledby="inventory-heading">
+      <div class="section-heading">
+        <h2 id="inventory-heading">Inventory</h2>
+        <span id="inventory-count" class="count-badge" aria-live="polite">0 items</span>
+      </div>
+
+      <p id="empty-state" class="empty-state">No items yet. Add your first item above.</p>
+      <ul id="inventory-list" aria-label="Inventory items"></ul>
+
+      <div class="inventory-actions">
+        <button id="clear-inventory" class="secondary-button danger-button" type="button" disabled>
+          Clear inventory
+        </button>
+      </div>
+
+      <div class="export-section" role="group" aria-labelledby="export-heading">
+        <h3 id="export-heading">Export inventory</h3>
+        <div class="export-buttons">
+          <button id="export-xlsx" class="secondary-button" type="button" disabled>Excel (.xlsx)</button>
+          <button id="export-docx" class="secondary-button" type="button" disabled>Word (.docx)</button>
+          <button id="export-html" class="secondary-button" type="button" disabled>Web page (.html)</button>
+        </div>
+      </div>
+    </section>
+
+    <p id="status-message" class="message status-message" role="status" aria-live="polite" aria-atomic="true"></p>
   </main>
-
-  <script src="script.js"></script>
 </body>
 </html>
