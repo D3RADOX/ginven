@@ -1,0 +1,26 @@
+{
+  "name": "ginven",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A private, browser-based inventory manager with genuine XLSX, DOCX, and HTML exports.",
+  "scripts": {
+    "start": "node tests/server.js",
+    "check:syntax": "node --check inventory.js && node --check exporters.js && node --check script.js",
+    "lint": "eslint .",
+    "validate:html": "html-validate index.html",
+    "test:unit": "node --test tests/*.test.js",
+    "test:office": "node tests/generate-fixtures.js && python3 tests/validate_office.py",
+    "test:e2e": "playwright test",
+    "test": "npm run test:unit",
+    "validate": "npm run check:syntax && npm run lint && npm run validate:html && npm run test:unit && npm run test:office",
+    "validate:ci": "npm run validate && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "eslint": "10.8.0",
+    "html-validate": "11.6.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
